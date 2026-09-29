@@ -2,7 +2,6 @@ import "server-only";
 
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import type { Readable } from "node:stream";
 
 import type { CourseSlug } from "@/lib/courses";
 
@@ -63,7 +62,7 @@ export async function createPdfDownloadUrl(objectKey: string, fileName: string) 
 }
 
 export async function createPdfUploadCommand(input: {
-  body: Blob | Buffer | Readable | ReadableStream | Uint8Array;
+  body: Blob | ReadableStream | Uint8Array;
   contentLength: number;
   courseSlug: CourseSlug;
   fileName: string;
