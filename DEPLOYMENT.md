@@ -13,6 +13,8 @@ In Cloudflare Workers > the Worker > Settings > Builds, use:
 
 Do not use the default deploy command `npx wrangler deploy` for this repository. If Wrangler runs without the vinext deploy command, it may auto-detect the app as Next.js/OpenNext and try to run an OpenNext migration.
 
+The Worker name is configured in `cloudflare.config.ts` as `aylem-spgg`. Do not pass `--name` to `vinext-cloudflare deploy` for this typed config setup.
+
 ## Runtime requirements
 
 - Node.js: `22.12+`

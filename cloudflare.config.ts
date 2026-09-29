@@ -2,7 +2,7 @@ import { bindings, defineConfig, defineWorker } from "cf/config";
 
 export default defineConfig({
   worker: defineWorker({
-    name: "aylem-learning-student-portal",
+    name: "aylem-spgg",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-09-29",
     compatibilityFlags: ["nodejs_compat"],
