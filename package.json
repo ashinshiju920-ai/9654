@@ -17,6 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "deploy": "vinext-cloudflare deploy",
+    "deploy:preview": "vinext-cloudflare deploy --preview",
     "cf:check": "vinext check",
     "cf:build": "bun run build:vinext",
     "cf:preview": "bun run start:vinext",
