@@ -68,10 +68,10 @@ R2_BUCKET_NAME=
 R2_ENDPOINT=
 
 # Development Test Credentials (optional overrides for db:seed)
-DEV_STUDENT_EMAIL=student@aylem.test
-DEV_STUDENT_PASSWORD=StudentPass123!
-DEV_ADMIN_EMAIL=admin@aylem.test
-DEV_ADMIN_PASSWORD=AdminPass123!
+DEV_STUDENT_EMAIL=
+DEV_STUDENT_PASSWORD=
+DEV_ADMIN_EMAIL=
+DEV_ADMIN_PASSWORD=
 ```
 
 ---
@@ -111,13 +111,8 @@ bun run build
 
 ---
 
-## Development Test Accounts
+## Development Seed Accounts
 
-When running `bun run db:seed`, the following accounts are provisioned:
+When running `bun run db:seed`, provide explicit `DEV_STUDENT_*` and `DEV_ADMIN_*` values in your local environment. Do not use production emails, production passwords, or real customer accounts for development seeding.
 
-| Role | Email | Default Password |
-|------|-------|------------------|
-| **Student** | `student@aylem.test` | `StudentPass123!` |
-| **Admin** | `admin@aylem.test` | `AdminPass123!` |
-
-*(Seeding is blocked automatically if `NODE_ENV === "production"` unless `ALLOW_PRODUCTION_SEED=true` is explicitly set).*
+Seeding is blocked automatically if `NODE_ENV === "production"` unless `ALLOW_PRODUCTION_SEED=true` is explicitly set.

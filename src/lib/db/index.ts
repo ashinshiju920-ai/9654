@@ -5,14 +5,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 
 import * as schema from "./schema";
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  "postgresql://aylem:aylem@localhost:5432/aylem";
+const DATABASE_URL = process.env.DATABASE_URL || "postgresql://aylem:aylem@localhost:5432/aylem";
 
 if (!process.env.DATABASE_URL && process.env.NODE_ENV === "production") {
-  console.warn(
-    "WARNING: DATABASE_URL environment variable is not set. Using fallback connection string.",
-  );
+  throw new Error("DATABASE_URL environment variable is required in production.");
 }
 
 /**

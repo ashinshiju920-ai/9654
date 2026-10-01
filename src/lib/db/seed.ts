@@ -10,15 +10,23 @@ async function seed() {
     process.exit(1);
   }
 
+  const studentEmail = process.env.DEV_STUDENT_EMAIL;
+  const studentPassword = process.env.DEV_STUDENT_PASSWORD;
+  const adminEmail = process.env.DEV_ADMIN_EMAIL;
+  const adminPassword = process.env.DEV_ADMIN_PASSWORD;
+
+  if (!studentEmail || !studentPassword || !adminEmail || !adminPassword) {
+    console.error(
+      "ERROR: DEV_STUDENT_EMAIL, DEV_STUDENT_PASSWORD, DEV_ADMIN_EMAIL, and DEV_ADMIN_PASSWORD are required to run the development seed.",
+    );
+    process.exit(1);
+  }
+
   console.log("Seeding development database...");
 
   // 1. Seed Users (Student & Admin)
-  const studentEmail = process.env.DEV_STUDENT_EMAIL || "student@aylem.test";
-  const studentPassword = process.env.DEV_STUDENT_PASSWORD || "StudentPass123!";
   const studentHash = hashPassword(studentPassword);
 
-  const adminEmail = process.env.DEV_ADMIN_EMAIL || "admin@aylem.test";
-  const adminPassword = process.env.DEV_ADMIN_PASSWORD || "AdminPass123!";
   const adminHash = hashPassword(adminPassword);
 
   const existingStudent = await db
@@ -111,7 +119,7 @@ async function seed() {
           courseId: ieltsCourseId,
           title: "IELTS Academic Writing Task 1 Guide",
           description: "Essential strategies, band descriptors, and model answers.",
-          r2ObjectKey: "materials/ielts/ielts-writing-task-1.pdf",
+          r2ObjectKey: "study-materials/ielts/ielts-writing-task-1.pdf",
           fileSizeBytes: 2450000,
           mimeType: "application/pdf",
           isPublished: true,
@@ -121,7 +129,7 @@ async function seed() {
           courseId: ieltsCourseId,
           title: "IELTS Speaking Part 2 Cue Cards Collection",
           description: "High-scoring idioms, vocabulary, and cue cards.",
-          r2ObjectKey: "materials/ielts/ielts-speaking-cards.pdf",
+          r2ObjectKey: "study-materials/ielts/ielts-speaking-cards.pdf",
           fileSizeBytes: 1850000,
           mimeType: "application/pdf",
           isPublished: true,

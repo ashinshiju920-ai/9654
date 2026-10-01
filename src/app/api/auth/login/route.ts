@@ -11,10 +11,10 @@ import {
 
 export async function POST(request: Request) {
   // Extract client IP for rate limiting.
-  // Behind Nginx, `x-real-ip` is set directly from $remote_addr and cannot be spoofed by clients.
+  // In production, Nginx must set `X-Real-IP` from `$remote_addr` and port 3000
+  // must remain private. Do not trust client-supplied forwarding chains here.
   const realIp = request.headers.get("x-real-ip");
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  const ip = realIp?.trim() || (forwardedFor ? forwardedFor.split(",")[0].trim() : "127.0.0.1");
+  const ip = realIp?.trim() || "direct-local";
 
   if (!checkLoginRateLimit(ip)) {
     return NextResponse.json(
