@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 
-import { hashPassword, invalidateAllUserSessions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { hashPasswordAsync, invalidateAllUserSessions } from "@/lib/auth";
+import { getDb } from "@/lib/db";
 import { passwordResetTokens, users } from "@/lib/db/schema";
 
 export async function POST(request: Request) {
@@ -40,6 +40,7 @@ export async function POST(request: Request) {
 
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const now = new Date();
+  const db = await getDb();
 
   const tokenRows = await db
     .select({
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
   }
 
   const tokenRow = tokenRows[0];
-  const newPasswordHash = hashPassword(password);
+  const newPasswordHash = await hashPasswordAsync(password);
 
   // Update user's password
   await db

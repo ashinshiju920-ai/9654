@@ -4,13 +4,14 @@ import { cache } from "react";
 import { and, desc, eq, asc } from "drizzle-orm";
 
 import type { CourseSlug } from "@/lib/courses";
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { courses, coursePdfs } from "@/lib/db/schema";
 import type { PublishedPdf } from "@/lib/types";
 
 export const getPublishedPdfsForCourse = cache(
   async (courseSlug: CourseSlug): Promise<PublishedPdf[]> => {
     try {
+      const db = await getDb();
       const rows = await db
         .select({
           id: coursePdfs.id,

@@ -12,3 +12,4 @@ bun.lockb
 tsconfig.tsbuildinfo
 .vinext/
 .cloudflare/
+.wrangler/

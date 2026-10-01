@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, desc, eq } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import {
   courses,
   questions,
@@ -41,6 +41,8 @@ export async function createQuizAttempt(
   testSize: number;
   questions: PublicQuizQuestion[];
 }> {
+  const db = await getDb();
+
   if (!quizSizes.includes(testSize as QuizSize)) {
     throw new Error(`Invalid test size: ${testSize}. Must be 20, 50, or 100.`);
   }
@@ -119,6 +121,7 @@ export async function createQuizAttempt(
  * Retrieve attempt metadata ensuring student ownership.
  */
 export async function getQuizAttempt(attemptId: string, userId: string) {
+  const db = await getDb();
   const attempts = await db
     .select({
       id: quizAttempts.id,
@@ -156,6 +159,7 @@ export async function getQuizAttempt(attemptId: string, userId: string) {
  * Get all completed or in-progress quiz attempts for a student.
  */
 export async function getUserQuizHistory(userId: string) {
+  const db = await getDb();
   return db
     .select({
       id: quizAttempts.id,

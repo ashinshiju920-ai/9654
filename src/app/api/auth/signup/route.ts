@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { getRuntimeEnvValue } from "@/lib/cloudflare/runtime";
+import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { createSession, hashPassword } from "@/lib/auth";
+import { createSession, hashPasswordAsync } from "@/lib/auth";
 
 export async function POST(request: Request) {
-  if (process.env.ALLOW_PUBLIC_SIGNUP !== "true") {
+  if ((await getRuntimeEnvValue("ALLOW_PUBLIC_SIGNUP")) !== "true") {
     return NextResponse.json(
       {
         error:
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const db = await getDb();
 
   // Basic email pattern check
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
@@ -71,7 +73,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const passwordHash = hashPassword(password);
+  const passwordHash = await hashPasswordAsync(password);
   const trimmedName = typeof fullName === "string" && fullName.trim() ? fullName.trim() : null;
 
   const [newUser] = await db

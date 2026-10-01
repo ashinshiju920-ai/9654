@@ -5,7 +5,8 @@ import { randomBytes, createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { eq, and, gt, lt } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { isProductionRuntime } from "@/lib/cloudflare/runtime";
+import { getDb } from "@/lib/db";
 import { sessions, users } from "@/lib/db/schema";
 
 /* ------------------------------------------------------------------ */
@@ -70,6 +71,7 @@ function hashToken(rawToken: string): string {
  * @returns The session row id.
  */
 export async function createSession(userId: string): Promise<string> {
+  const db = await getDb();
   const rawToken = generateSessionToken();
   const tokenHash = hashToken(rawToken);
   const now = new Date();
@@ -88,7 +90,7 @@ export async function createSession(userId: string): Promise<string> {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, rawToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: await isProductionRuntime(),
     sameSite: "lax",
     path: "/",
     maxAge: Math.floor(SESSION_TTL_MS / 1000),
@@ -118,6 +120,7 @@ export async function getCurrentSession(): Promise<{
 
   const tokenHash = hashToken(rawToken);
   const now = new Date();
+  const db = await getDb();
 
   const result = await db
     .select({
@@ -180,12 +183,13 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
  * Also clears the session cookie.
  */
 export async function invalidateSession(sessionId: string): Promise<void> {
+  const db = await getDb();
   await db.delete(sessions).where(eq(sessions.id, sessionId));
 
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: await isProductionRuntime(),
     sameSite: "lax",
     path: "/",
     maxAge: 0,
@@ -196,6 +200,7 @@ export async function invalidateSession(sessionId: string): Promise<void> {
  * Invalidate ALL sessions for a user (e.g. password change, account compromise).
  */
 export async function invalidateAllUserSessions(userId: string): Promise<void> {
+  const db = await getDb();
   await db.delete(sessions).where(eq(sessions.userId, userId));
 }
 
@@ -204,6 +209,7 @@ export async function invalidateAllUserSessions(userId: string): Promise<void> {
  * Intended to be called periodically (e.g. cron, or inline with low frequency).
  */
 export async function cleanExpiredSessions(): Promise<number> {
+  const db = await getDb();
   const result = await db
     .delete(sessions)
     .where(lt(sessions.expiresAt, new Date()))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hashPassword, verifyPassword } from "./password";
+import { hashPassword, hashPasswordAsync, verifyPassword, verifyPasswordAsync } from "./password";
 
 describe("Password Hashing & Verification (scrypt)", () => {
   it("hashes password with salt:hash format", () => {
@@ -29,6 +29,17 @@ describe("Password Hashing & Verification (scrypt)", () => {
     const hash = hashPassword(raw);
 
     expect(verifyPassword(raw, hash)).toBe(true);
+  });
+
+  it("keeps async scrypt compatible with existing stored hash format", async () => {
+    const raw = "CorrectPassword@2026";
+    const hash = hashPassword(raw);
+
+    expect(await verifyPasswordAsync(raw, hash)).toBe(true);
+    expect(await verifyPasswordAsync("WrongPassword@2026", hash)).toBe(false);
+
+    const asyncHash = await hashPasswordAsync(raw);
+    expect(verifyPassword(raw, asyncHash)).toBe(true);
   });
 
   it("rejects wrong password", () => {

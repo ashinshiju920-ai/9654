@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { requireUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
 export async function GET() {
@@ -13,6 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const db = await getDb();
   const userList = await db
     .select({
       id: users.id,
@@ -57,6 +58,7 @@ export async function PATCH(request: Request) {
   // Only permit updating fullName - ignore or reject any attempts to update role/status/email
   const sanitizedName = typeof fullName === "string" ? fullName.trim() : null;
 
+  const db = await getDb();
   const [updated] = await db
     .update(users)
     .set({

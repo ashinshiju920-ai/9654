@@ -1,8 +1,6 @@
 import "server-only";
 
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-
+import { getCloudflareEnv } from "@/lib/cloudflare/runtime";
 import type { CourseSlug } from "@/lib/courses";
 
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 180;
@@ -32,7 +30,8 @@ export function getR2Config(): R2Config {
   return { accountId, accessKeyId, secretAccessKey, bucketName, endpoint };
 }
 
-export function createR2Client() {
+export async function createR2Client() {
+  const { S3Client } = await import("@aws-sdk/client-s3");
   const config = getR2Config();
 
   return new S3Client({
@@ -49,8 +48,10 @@ export function createR2Client() {
 export async function createPdfDownloadUrl(objectKey: string, fileName: string) {
   assertSafeR2ObjectKey(objectKey);
 
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
   const config = getR2Config();
-  const client = createR2Client();
+  const client = await createR2Client();
   const command = new GetObjectCommand({
     Bucket: config.bucketName,
     Key: objectKey,
@@ -59,6 +60,39 @@ export async function createPdfDownloadUrl(objectKey: string, fileName: string) 
   });
 
   return getSignedUrl(client, command, { expiresIn: DEFAULT_SIGNED_URL_TTL_SECONDS });
+}
+
+export async function createPdfDownloadResponse(objectKey: string, fileName: string) {
+  assertSafeR2ObjectKey(objectKey);
+
+  const cloudflareEnv = await getCloudflareEnv();
+  const bucket = cloudflareEnv?.MATERIALS_BUCKET;
+
+  if (bucket) {
+    const object = await bucket.get(objectKey);
+
+    if (!object) {
+      throw new Error("PDF object not found.");
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set("Content-Type", PDF_MIME_TYPE);
+    headers.set("Content-Disposition", `attachment; filename="${sanitizeDownloadFileName(fileName)}"`);
+    headers.set("Cache-Control", "private, no-store");
+
+    if (object.httpEtag) {
+      headers.set("ETag", object.httpEtag);
+    }
+
+    if (typeof object.size === "number") {
+      headers.set("Content-Length", String(object.size));
+    }
+
+    return new Response(object.body, { headers });
+  }
+
+  return Response.redirect(await createPdfDownloadUrl(objectKey, fileName), 302);
 }
 
 export async function createPdfUploadCommand(input: {
@@ -72,6 +106,7 @@ export async function createPdfUploadCommand(input: {
   }
 
   const objectKey = createCoursePdfObjectKey(input.courseSlug, input.fileName);
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
   const config = getR2Config();
 
   return {

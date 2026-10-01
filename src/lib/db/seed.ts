@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
-import { hashPassword } from "@/lib/auth/password";
-import { db, pool } from "@/lib/db";
+import { hashPasswordAsync } from "@/lib/auth/password";
+import { getDb, getPool } from "@/lib/db";
 import { coursePdfs, courses, questions, users } from "@/lib/db/schema";
 
 async function seed() {
@@ -22,12 +22,13 @@ async function seed() {
     process.exit(1);
   }
 
+  const db = await getDb();
   console.log("Seeding development database...");
 
   // 1. Seed Users (Student & Admin)
-  const studentHash = hashPassword(studentPassword);
+  const studentHash = await hashPasswordAsync(studentPassword);
 
-  const adminHash = hashPassword(adminPassword);
+  const adminHash = await hashPasswordAsync(adminPassword);
 
   const existingStudent = await db
     .select({ id: users.id })
@@ -167,6 +168,7 @@ async function seed() {
   }
 
   console.log("Database seeding completed successfully!");
+  const pool = await getPool();
   await pool.end();
 }
 

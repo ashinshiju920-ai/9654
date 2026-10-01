@@ -3,10 +3,22 @@ import { Buffer } from "node:buffer";
 import { randomBytes, createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { checkAuthRateLimit } from "@/lib/auth";
+import { getTrustedClientIdentity } from "@/lib/cloudflare/client-ip";
+import { getDb } from "@/lib/db";
 import { passwordResetTokens, users } from "@/lib/db/schema";
 
 export async function POST(request: Request) {
+  const clientIdentity = await getTrustedClientIdentity(request);
+
+  if (!(await checkAuthRateLimit({ clientIdentity, purpose: "password-reset" }))) {
+    return NextResponse.json({
+      success: true,
+      message:
+        "If an account exists with this email, password reset instructions will be sent. (Email delivery integration is currently pending).",
+    });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -25,6 +37,7 @@ export async function POST(request: Request) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const db = await getDb();
 
   const userList = await db
     .select({ id: users.id, accountStatus: users.accountStatus })

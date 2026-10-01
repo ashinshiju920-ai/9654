@@ -5,7 +5,7 @@
  * can import from `@/lib/auth` directly.
  */
 
-export { hashPassword, verifyPassword } from "./password";
+export { hashPassword, hashPasswordAsync, verifyPassword, verifyPasswordAsync } from "./password";
 export {
   createSession,
   getCurrentSession,
@@ -24,4 +24,9 @@ export {
   AuthenticationError,
   AuthorizationError,
 } from "./guard";
-export { checkLoginRateLimit, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_ATTEMPTS } from "./rate-limit";
+export {
+  checkAuthRateLimit,
+  checkLoginRateLimit,
+  RATE_LIMIT_WINDOW_MS,
+  RATE_LIMIT_MAX_ATTEMPTS,
+} from "./rate-limit";

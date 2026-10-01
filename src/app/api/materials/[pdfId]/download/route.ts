@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
 import { getCurrentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { courses, coursePdfs } from "@/lib/db/schema";
 import { isUuid } from "@/lib/materials";
-import { createPdfDownloadUrl } from "@/lib/r2/client";
+import { createPdfDownloadResponse } from "@/lib/r2/client";
 
 type DownloadRouteProps = {
   params: Promise<{
@@ -13,7 +13,36 @@ type DownloadRouteProps = {
   }>;
 };
 
-export async function POST(_request: Request, { params }: DownloadRouteProps) {
+export async function POST(request: Request, props: DownloadRouteProps) {
+  const material = await authorizeMaterialDownload(props);
+
+  if (material instanceof Response) {
+    return material;
+  }
+
+  return NextResponse.json({
+    url: new URL(`/api/materials/${material.id}/download`, request.url).toString(),
+  });
+}
+
+export async function GET(_request: Request, props: DownloadRouteProps) {
+  const material = await authorizeMaterialDownload(props);
+
+  if (material instanceof Response) {
+    return material;
+  }
+
+  try {
+    return await createPdfDownloadResponse(material.r2ObjectKey, material.title);
+  } catch {
+    return NextResponse.json(
+      { error: "The file is temporarily unavailable. Please try again later." },
+      { status: 503 },
+    );
+  }
+}
+
+async function authorizeMaterialDownload({ params }: DownloadRouteProps) {
   const { pdfId } = await params;
 
   if (!isUuid(pdfId)) {
@@ -30,6 +59,7 @@ export async function POST(_request: Request, { params }: DownloadRouteProps) {
     );
   }
 
+  const db = await getDb();
   // Look up PDF and its parent course with active/published status
   const results = await db
     .select({
@@ -57,15 +87,5 @@ export async function POST(_request: Request, { params }: DownloadRouteProps) {
     );
   }
 
-  const pdf = results[0];
-
-  try {
-    const url = await createPdfDownloadUrl(pdf.r2ObjectKey, pdf.title);
-    return NextResponse.json({ url });
-  } catch {
-    return NextResponse.json(
-      { error: "The file is temporarily unavailable. Please try again later." },
-      { status: 503 },
-    );
-  }
+  return results[0];
 }

@@ -1,22 +1,19 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { getTrustedClientIdentity } from "@/lib/cloudflare/client-ip";
+import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import {
-  checkLoginRateLimit,
+  checkAuthRateLimit,
   createSession,
-  verifyPassword,
+  verifyPasswordAsync,
 } from "@/lib/auth";
 
 export async function POST(request: Request) {
-  // Extract client IP for rate limiting.
-  // In production, Nginx must set `X-Real-IP` from `$remote_addr` and port 3000
-  // must remain private. Do not trust client-supplied forwarding chains here.
-  const realIp = request.headers.get("x-real-ip");
-  const ip = realIp?.trim() || "direct-local";
+  const clientIdentity = await getTrustedClientIdentity(request);
 
-  if (!checkLoginRateLimit(ip)) {
+  if (!(await checkAuthRateLimit({ clientIdentity, purpose: "login" }))) {
     return NextResponse.json(
       { error: "Too many login attempts. Please try again in 15 minutes." },
       { status: 429 },
@@ -44,6 +41,7 @@ export async function POST(request: Request) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const db = await getDb();
 
   const userList = await db
     .select()
@@ -60,7 +58,7 @@ export async function POST(request: Request) {
 
   const user = userList[0];
 
-  if (!user.passwordHash || !verifyPassword(password, user.passwordHash)) {
+  if (!user.passwordHash || !(await verifyPasswordAsync(password, user.passwordHash))) {
     return NextResponse.json(
       { error: "Invalid email or password." },
       { status: 401 },
