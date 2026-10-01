@@ -6,8 +6,6 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui";
-import { createClient } from "@/lib/supabase/browser";
-import { getAuthRedirectUrl, toAuthMessage } from "../auth/auth-utils";
 
 export function LoginForm() {
   const router = useRouter();
@@ -19,45 +17,33 @@ export function LoginForm() {
   async function handleEmailLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
-
-    if (!hasSupabaseConfig()) {
-      setErrorMessage("Supabase environment variables are not configured yet.");
-      return;
-    }
-
     setIsLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setIsLoading(false);
 
-    if (error) {
-      setErrorMessage(toAuthMessage(error.message));
-      return;
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        setErrorMessage(data.error || "Invalid email or password.");
+        setIsLoading(false);
+        return;
+      }
+
+      router.replace("/dashboard");
+      router.refresh();
+    } catch {
+      setErrorMessage("An error occurred connecting to the server. Please try again.");
+      setIsLoading(false);
     }
-
-    router.replace("/dashboard");
-    router.refresh();
   }
 
-  async function handleGoogleLogin() {
-    setErrorMessage("");
-
-    if (!hasSupabaseConfig()) {
-      setErrorMessage("Supabase environment variables are not configured yet.");
-      return;
-    }
-
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: getAuthRedirectUrl("/dashboard"),
-      },
-    });
-
-    if (error) {
-      setErrorMessage(toAuthMessage(error.message));
-    }
+  function handleGoogleLogin() {
+    setErrorMessage("Google login is currently disabled. Please log in with your email and password.");
   }
 
   return (
@@ -123,11 +109,5 @@ export function LoginForm() {
         Don&apos;t have an account? <Link href="/signup">Create account.</Link>
       </p>
     </form>
-  );
-}
-
-function hasSupabaseConfig() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   );
 }

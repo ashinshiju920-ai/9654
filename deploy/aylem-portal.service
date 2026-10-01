@@ -1,0 +1,39 @@
+[Unit]
+Description=Aylem Learning Student Portal (Next.js Standalone)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=aylem
+Group=aylem
+WorkingDirectory=/var/www/aylem-portal
+
+# Production environment variables file
+EnvironmentFile=/var/www/aylem-portal/.env.production
+
+# Node environment settings
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+
+# Execute standalone Next.js server
+ExecStart=/usr/bin/node /var/www/aylem-portal/.next/standalone/server.js
+
+# Reliability and auto-recovery
+Restart=always
+RestartSec=5s
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aylem-portal
+
+[Install]
+WantedBy=multi-user.target

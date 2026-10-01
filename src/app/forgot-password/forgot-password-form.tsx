@@ -5,8 +5,6 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui";
-import { createClient } from "@/lib/supabase/browser";
-import { getAuthRedirectUrl, toAuthMessage } from "../auth/auth-utils";
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
@@ -20,19 +18,28 @@ export function ForgotPasswordForm() {
     setIsSuccess(false);
     setIsLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: getAuthRedirectUrl("/reset-password"),
-    });
-    setIsLoading(false);
+    try {
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
 
-    if (error) {
-      setMessage(toAuthMessage(error.message));
-      return;
+      const data = (await response.json()) as { error?: string; message?: string };
+
+      setIsLoading(false);
+
+      if (!response.ok) {
+        setMessage(data.error || "An error occurred while requesting password reset.");
+        return;
+      }
+
+      setIsSuccess(true);
+      setMessage(data.message || "Password reset request recorded.");
+    } catch {
+      setIsLoading(false);
+      setMessage("An error occurred connecting to the server. Please try again.");
     }
-
-    setIsSuccess(true);
-    setMessage("Check your email for the password reset link.");
   }
 
   return (

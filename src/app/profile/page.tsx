@@ -1,8 +1,12 @@
 import { User } from "lucide-react";
 
-import { Badge, Card, CardBody, CardHeader, EmptyState, Input } from "@/components/ui";
+import { Badge, Card, CardBody, CardHeader } from "@/components/ui";
+import { requireUserOrRedirect } from "@/lib/auth";
+import { ProfileEditor } from "./profile-editor";
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const user = await requireUserOrRedirect("/login");
+
   return (
     <div className="page">
       <section className="page-header">
@@ -10,7 +14,7 @@ export default function ProfilePage() {
           <p className="page-kicker">Profile</p>
           <h1 className="page-title">Student profile</h1>
           <p className="page-subtitle">
-            Profile settings will be connected to Supabase authentication in the auth phase.
+            Manage your personal details and account settings.
           </p>
         </div>
       </section>
@@ -24,14 +28,11 @@ export default function ProfilePage() {
           <User size={22} color="#0AA69A" aria-hidden="true" />
         </CardHeader>
         <CardBody>
-          <div className="stat-grid">
-            <Input disabled label="Name" placeholder="Available after sign in" />
-            <Input disabled label="Email" placeholder="Available after sign in" />
-            <Input disabled label="Course focus" placeholder="Not selected" />
-          </div>
-          <EmptyState
-            title="Authentication not connected"
-            message="Editable profile controls will be enabled after Supabase auth is implemented."
+          <ProfileEditor
+            initialEmail={user.email}
+            initialFullName={user.fullName}
+            role={user.role}
+            accountStatus={user.accountStatus}
           />
         </CardBody>
       </Card>

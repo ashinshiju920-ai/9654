@@ -5,7 +5,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthShell
       kicker="Password Help"
-      subtitle="Enter your email and Supabase will send a secure reset link"
+      subtitle="Enter your email to request a secure password reset link"
       title="Reset Access"
     >
       <ForgotPasswordForm />

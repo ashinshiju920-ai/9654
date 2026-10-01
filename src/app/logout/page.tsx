@@ -4,17 +4,20 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { Loader } from "@/components/ui";
-import { createClient } from "@/lib/supabase/browser";
 
 export default function LogoutPage() {
   const router = useRouter();
 
   useEffect(() => {
     async function signOut() {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      router.replace("/login");
-      router.refresh();
+      try {
+        await fetch("/api/auth/logout", { method: "POST" });
+      } catch (error) {
+        console.error("Error during sign out:", error);
+      } finally {
+        router.replace("/login");
+        router.refresh();
+      }
     }
 
     void signOut();

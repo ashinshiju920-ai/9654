@@ -1,55 +1,49 @@
 import "server-only";
 
 import { cache } from "react";
+import { and, desc, eq, asc } from "drizzle-orm";
 
 import type { CourseSlug } from "@/lib/courses";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { courses, coursePdfs } from "@/lib/db/schema";
 import type { PublishedPdf } from "@/lib/types";
-
-type PdfRow = {
-  created_at: string;
-  description: string | null;
-  file_size_bytes: number | null;
-  id: string;
-  mime_type: string | null;
-  title: string;
-};
 
 export const getPublishedPdfsForCourse = cache(
   async (courseSlug: CourseSlug): Promise<PublishedPdf[]> => {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("course_pdfs")
-      .select(
-        `
-          id,
-          title,
-          description,
-          file_size_bytes,
-          mime_type,
-          created_at,
-          courses!inner(slug, is_active)
-        `,
-      )
-      .eq("is_published", true)
-      .eq("courses.slug", courseSlug)
-      .eq("courses.is_active", true)
-      .order("display_order", { ascending: true })
-      .order("created_at", { ascending: false });
+    try {
+      const rows = await db
+        .select({
+          id: coursePdfs.id,
+          title: coursePdfs.title,
+          description: coursePdfs.description,
+          fileSizeBytes: coursePdfs.fileSizeBytes,
+          mimeType: coursePdfs.mimeType,
+          createdAt: coursePdfs.createdAt,
+        })
+        .from(coursePdfs)
+        .innerJoin(courses, eq(coursePdfs.courseId, courses.id))
+        .where(
+          and(
+            eq(coursePdfs.isPublished, true),
+            eq(courses.slug, courseSlug),
+            eq(courses.isActive, true),
+          ),
+        )
+        .orderBy(asc(coursePdfs.displayOrder), desc(coursePdfs.createdAt));
 
-    if (error) {
-      throw new Error("Unable to load study materials.");
+      return rows.map((pdf) => ({
+        courseSlug,
+        description: pdf.description,
+        fileSizeBytes: pdf.fileSizeBytes,
+        id: pdf.id,
+        mimeType: pdf.mimeType ?? "application/pdf",
+        publishedAt: pdf.createdAt.toISOString(),
+        title: pdf.title,
+      }));
+    } catch {
+      // In development or when database is not yet seeded, return empty array gracefully
+      return [];
     }
-
-    return ((data ?? []) as PdfRow[]).map((pdf) => ({
-      courseSlug,
-      description: pdf.description,
-      fileSizeBytes: pdf.file_size_bytes,
-      id: pdf.id,
-      mimeType: pdf.mime_type ?? "application/pdf",
-      publishedAt: pdf.created_at,
-      title: pdf.title,
-    }));
   },
 );
 

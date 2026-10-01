@@ -1,82 +1,123 @@
 # Aylem Learning Student Portal
 
-Standalone student portal for Aylem Learning. This repository is intentionally separate from the
-marketing website and does not include payment or Cashfree integration.
+Standalone student portal for Aylem Learning, deployed on a self-hosted Linux VPS (IndiaHost).
 
-## Recommended Stack
+> **Architecture Status**: Built entirely on self-hosted PostgreSQL + Drizzle ORM + secure database-backed session authentication. Supabase has been permanently removed from the application.
 
-- **Next.js App Router + TypeScript** for course pages, server routes, SSR-friendly authentication,
-  and a clear split between server and client components.
-- **Cloudflare Workers deployment via `vinext`** because Cloudflare's current Workers docs recommend
-  `vinext` as the default path for full-stack Next.js apps on Workers.
-- **Supabase Auth + Postgres** for login, roles, editable course PDFs, quiz questions, quiz attempts,
-  and admin workflows.
-- **Cloudflare R2** for private PDF objects. The browser should never receive permanent object keys;
-  downloads should go through server-only authorization and short-lived signed access.
-- **Bun** for package management in this workspace, matching the local toolchain.
-- **Vitest + Testing Library**, **ESLint**, **Prettier**, and **TypeScript** for tests, linting,
-  formatting, and type checking.
+---
 
-Cloudflare adapter commands require **Node.js 22.12+**. The plain Next.js build works on the local
-Node 20.18 runtime, but `vinext` and Vite need a newer Node runtime for Cloudflare builds.
+## Target Architecture
 
-## Folder Structure
-
-```text
-src/
-  app/
-    page.tsx                  # Student portal landing screen
-    courses/[slug]/page.tsx   # One page per course with published PDFs and quiz link
-    courses/[slug]/quiz/      # Quiz attempt entry route
-    api/pdfs/[id]/route.ts    # Server-only PDF delivery boundary
-  lib/
-    courses.ts                # Course registry: IELTS, OET, PTE, German
-    quiz.ts                   # Quiz selection/shuffle logic
-    supabase/
-      browser.ts              # Browser Supabase client
-      server.ts               # Server Supabase client using cookies
+```
+Student Browser
+      │
+      ▼
+    Nginx (Reverse Proxy & SSL Termination)
+      │
+      ▼
+Next.js 16 Application Server (Node.js runtime, single VPS)
+      │
+      ├─ Proxy / Middleware: Edge-level cookie validation (`aylem_session`)
+      ├─ Server Components & APIs: Cryptographic session lookup & RBAC
+      ├─ Password Security: Built-in scrypt (N=16384, r=8, p=1) with 32-byte salt
+      ├─ Cloudflare R2: S3-compatible private PDF storage with signed URLs
+      │
+      ▼
+PostgreSQL (Local / Self-hosted database)
+      ├─ users
+      ├─ sessions (opaque SHA-256 hashed tokens)
+      ├─ password_reset_tokens
+      ├─ courses
+      ├─ course_pdfs
+      ├─ questions
+      ├─ quiz_attempts
+      ├─ quiz_attempt_questions
+      └─ student_answers
 ```
 
-## Server and Client Boundaries
+---
 
-- Course pages are server components by default. They should read published PDFs from Supabase after
-  auth is wired.
-- Quiz attempt creation must happen on the server so the selected shuffled question IDs can be locked
-  for the attempt.
-- Admin PDF/question management should write to Supabase through authenticated server actions or route
-  handlers.
-- PDF files stay private in R2. The browser calls `/api/pdfs/[id]`; that route verifies Supabase
-  access and returns a short-lived download response.
-- `NEXT_PUBLIC_*` variables are safe for browser use. Service-role keys and R2 credentials must stay
-  server-only.
+## Security & Session Architecture
 
-## Local Setup
+- **Session Tokens**: 256-bit cryptographically secure random entropy stored in an `HttpOnly`, `SameSite=Lax` cookie (`aylem_session`).
+- **Database Storage**: The database only stores SHA-256 hashes of session tokens.
+- **Account Status**: Every authenticated request verifies `account_status === 'active'`. Suspended or disabled accounts cannot access protected content.
+- **Role-Based Access**: Role validation (`student`, `admin`) is performed server-side via `requireUser()` and `requireAdmin()`.
+- **Question & Answer Protection**: Quiz questions sent to students are strictly sanitized—answer keys and explanations remain server-side.
+- **PDF Access Protection**: Materials are delivered via short-lived signed URLs generated only after verifying authenticated student status.
+- **Rate Limiting**: In-memory sliding-window rate limiting on login attempts (10 attempts per 15-minute window per IP).
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env.local` for development:
 
 ```bash
-bun install
-cp .env.local.example .env.local
-bun run dev
+# Database (PostgreSQL)
+DATABASE_URL=postgresql://aylem:aylem@localhost:5432/aylem
+
+# Public Signup Configuration (disabled by default in production)
+ALLOW_PUBLIC_SIGNUP=true
+
+# Private Storage (Cloudflare R2 / S3-compatible)
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_ENDPOINT=
+
+# Development Test Credentials (optional overrides for db:seed)
+DEV_STUDENT_EMAIL=student@aylem.test
+DEV_STUDENT_PASSWORD=StudentPass123!
+DEV_ADMIN_EMAIL=admin@aylem.test
+DEV_ADMIN_PASSWORD=AdminPass123!
 ```
 
-Fill `.env.local` with real local credentials when Supabase and R2 projects exist. The committed env
-files contain placeholders only.
+---
 
-## Quality Commands
+## Database Management & Migrations
+
+Drizzle ORM manages the PostgreSQL schema:
 
 ```bash
-bun run lint
-bun run format:check
-bun run typecheck
+# Generate SQL migrations from schema definitions
+bun run db:generate
+
+# Apply migrations to the database
+bun run db:migrate
+
+# Seed development database (1 student, 1 admin, 4 courses, sample materials, sample questions)
+bun run db:seed
+```
+
+---
+
+## Quality & Verification Commands
+
+```bash
+# Run test suite (Vitest)
 bun run test
+
+# Run TypeScript typecheck
+bun run typecheck
+
+# Run ESLint
+bun run lint
+
+# Production build (Next.js)
 bun run build
 ```
 
-## Cloudflare Commands
+---
 
-```bash
-bun run build:vinext
-bun run start:vinext
-bun run deploy:vinext
-```
+## Development Test Accounts
 
-Update `cloudflare.config.ts` with the real private R2 bucket binding before deploying.
+When running `bun run db:seed`, the following accounts are provisioned:
+
+| Role | Email | Default Password |
+|------|-------|------------------|
+| **Student** | `student@aylem.test` | `StudentPass123!` |
+| **Admin** | `admin@aylem.test` | `AdminPass123!` |
+
+*(Seeding is blocked automatically if `NODE_ENV === "production"` unless `ALLOW_PRODUCTION_SEED=true` is explicitly set).*

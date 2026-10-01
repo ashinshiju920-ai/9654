@@ -22,15 +22,14 @@
         "name": "next"
       }
     ],
-    "types": ["@cloudflare/workers-types", "vitest/globals"]
+    "types": ["vitest/globals"]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    ".cloudflare/types/**/*.ts"
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

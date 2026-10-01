@@ -1,13 +1,13 @@
 import { BookOpenCheck, ShieldCheck } from "lucide-react";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { Badge, ButtonLink, Card, CardBody, CardHeader } from "@/components/ui";
 import { MaterialsList } from "./materials-list";
+import { requireUserOrRedirect } from "@/lib/auth";
 import { getCourse } from "@/lib/courses";
 import { courseAccents } from "@/lib/design";
 import { getPublishedPdfsForCourse } from "@/lib/materials";
 import { quizSizes } from "@/lib/quiz";
-import { createClient } from "@/lib/supabase/server";
 
 type CoursePageProps = {
   params: Promise<{
@@ -23,14 +23,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
     notFound();
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  await requireUserOrRedirect("/login");
 
   const pdfs = await getPublishedPdfsForCourse(course.slug);
 

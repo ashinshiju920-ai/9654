@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { Badge, ButtonLink, Card, CardBody, CardHeader } from "@/components/ui";
+import { requireUserOrRedirect } from "@/lib/auth";
 import { getCourse } from "@/lib/courses";
 import { quizSizes } from "@/lib/quiz";
 
@@ -17,6 +18,8 @@ export default async function QuizPage({ params }: QuizPageProps) {
   if (!course) {
     notFound();
   }
+
+  await requireUserOrRedirect("/login");
 
   return (
     <div className="page">

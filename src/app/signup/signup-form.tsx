@@ -3,12 +3,12 @@
 import { Lock, Mail, User } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui";
-import { createClient } from "@/lib/supabase/browser";
-import { getAuthRedirectUrl, toAuthMessage } from "../auth/auth-utils";
 
 export function SignupForm() {
+  const router = useRouter();
   const [confirmPassword, setConfirmPassword] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -27,32 +27,42 @@ export function SignupForm() {
       return;
     }
 
-    setIsLoading(true);
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: name },
-        emailRedirectTo: getAuthRedirectUrl("/dashboard"),
-      },
-    });
-    setIsLoading(false);
-
-    if (error) {
-      setMessage(toAuthMessage(error.message));
+    if (password.length < 8) {
+      setMessage("Password must be at least 8 characters long.");
       return;
     }
 
-    setIsSuccess(true);
-    setMessage(
-      data.session
-        ? "Account created. Redirecting you to the dashboard..."
-        : "Check your email to verify your account, then return to log in.",
-    );
+    setIsLoading(true);
 
-    if (data.session) {
-      window.location.replace("/dashboard");
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName: name,
+        }),
+      });
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        setMessage(data.error || "Failed to create account.");
+        setIsLoading(false);
+        return;
+      }
+
+      setIsSuccess(true);
+      setMessage("Account created successfully! Redirecting to dashboard...");
+
+      setTimeout(() => {
+        router.replace("/dashboard");
+        router.refresh();
+      }, 500);
+    } catch {
+      setMessage("An error occurred connecting to the server. Please try again.");
+      setIsLoading(false);
     }
   }
 
@@ -96,10 +106,10 @@ export function SignupForm() {
           <Lock size={17} aria-hidden="true" />
           <input
             autoComplete="new-password"
-            minLength={6}
+            minLength={8}
             name="password"
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Password"
+            placeholder="Password (minimum 8 characters)"
             required
             type="password"
             value={password}
@@ -113,7 +123,7 @@ export function SignupForm() {
           <Lock size={17} aria-hidden="true" />
           <input
             autoComplete="new-password"
-            minLength={6}
+            minLength={8}
             name="confirmPassword"
             onChange={(event) => setConfirmPassword(event.target.value)}
             placeholder="Confirm password"

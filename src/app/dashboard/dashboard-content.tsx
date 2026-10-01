@@ -15,8 +15,8 @@ export function DashboardContent() {
           </p>
         </div>
         <Toast
-          title="Portal scaffold"
-          message="Supabase and R2 wiring are ready for the next build phase."
+          title="Student Portal"
+          message="PostgreSQL and R2 wiring are active."
         />
       </section>
 

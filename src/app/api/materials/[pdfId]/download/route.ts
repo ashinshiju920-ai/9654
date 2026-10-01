@@ -1,22 +1,16 @@
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 
+import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { courses, coursePdfs } from "@/lib/db/schema";
 import { isUuid } from "@/lib/materials";
 import { createPdfDownloadUrl } from "@/lib/r2/client";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 type DownloadRouteProps = {
   params: Promise<{
     pdfId: string;
   }>;
-};
-
-type PdfDownloadRow = {
-  courses: { is_active: boolean; slug: string }[] | { is_active: boolean; slug: string } | null;
-  id: string;
-  is_published: boolean;
-  r2_object_key: string;
-  title: string;
 };
 
 export async function POST(_request: Request, { params }: DownloadRouteProps) {
@@ -26,38 +20,47 @@ export async function POST(_request: Request, { params }: DownloadRouteProps) {
     return NextResponse.json({ error: "Invalid material request." }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  // Server-side authentication check
+  const user = await getCurrentUser();
 
-  if (userError || !user) {
-    return NextResponse.json({ error: "Please log in to download study materials." }, { status: 401 });
+  if (!user) {
+    return NextResponse.json(
+      { error: "Please log in to download study materials." },
+      { status: 401 },
+    );
   }
 
-  const adminSupabase = createAdminClient();
-  const { data, error } = await adminSupabase
-    .from("course_pdfs")
-    .select("id,title,r2_object_key,is_published,courses!inner(slug,is_active)")
-    .eq("id", pdfId)
-    .eq("is_published", true)
-    .eq("courses.is_active", true)
-    .single();
+  // Look up PDF and its parent course with active/published status
+  const results = await db
+    .select({
+      id: coursePdfs.id,
+      title: coursePdfs.title,
+      r2ObjectKey: coursePdfs.r2ObjectKey,
+      isPublished: coursePdfs.isPublished,
+      courseActive: courses.isActive,
+    })
+    .from(coursePdfs)
+    .innerJoin(courses, eq(coursePdfs.courseId, courses.id))
+    .where(
+      and(
+        eq(coursePdfs.id, pdfId),
+        eq(coursePdfs.isPublished, true),
+        eq(courses.isActive, true),
+      ),
+    )
+    .limit(1);
 
-  if (error || !data) {
-    return NextResponse.json({ error: "This study material is not available." }, { status: 404 });
+  if (results.length === 0) {
+    return NextResponse.json(
+      { error: "This study material is not available." },
+      { status: 404 },
+    );
   }
 
-  const pdf = data as PdfDownloadRow;
-  const course = Array.isArray(pdf.courses) ? pdf.courses[0] : pdf.courses;
-
-  if (!pdf.is_published || !course?.is_active) {
-    return NextResponse.json({ error: "This study material is not available." }, { status: 404 });
-  }
+  const pdf = results[0];
 
   try {
-    const url = await createPdfDownloadUrl(pdf.r2_object_key, pdf.title);
+    const url = await createPdfDownloadUrl(pdf.r2ObjectKey, pdf.title);
     return NextResponse.json({ url });
   } catch {
     return NextResponse.json(
