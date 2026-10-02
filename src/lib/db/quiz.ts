@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { withDb } from "@/lib/db";
 import {
@@ -8,6 +8,7 @@ import {
   questions,
   quizAttempts,
   quizAttemptQuestions,
+  studentAnswers,
 } from "@/lib/db/schema";
 import { quizSizes } from "@/lib/quiz";
 import type { QuizSize } from "@/lib/types";
@@ -20,6 +21,11 @@ export type PublicQuizQuestion = {
   optionB: string;
   optionC: string;
   optionD: string;
+};
+
+export type QuizAnswerInput = {
+  questionId: string;
+  selectedOption: "A" | "B" | "C" | "D";
 };
 
 /**
@@ -177,5 +183,158 @@ export async function getUserQuizHistory(userId: string) {
       .innerJoin(courses, eq(quizAttempts.courseId, courses.id))
       .where(eq(quizAttempts.userId, userId))
       .orderBy(desc(quizAttempts.createdAt)),
+  );
+}
+
+export async function getLockedQuizAttempt(attemptId: string, userId: string) {
+  const attempt = await getQuizAttempt(attemptId, userId);
+
+  if (!attempt) {
+    return null;
+  }
+
+  const lockedQuestions = await withDb((db) =>
+    db
+      .select({
+        id: questions.id,
+        order: quizAttemptQuestions.questionOrder,
+        questionText: questions.questionText,
+        optionA: questions.optionA,
+        optionB: questions.optionB,
+        optionC: questions.optionC,
+        optionD: questions.optionD,
+      })
+      .from(quizAttemptQuestions)
+      .innerJoin(questions, eq(quizAttemptQuestions.questionId, questions.id))
+      .where(eq(quizAttemptQuestions.attemptId, attemptId))
+      .orderBy(quizAttemptQuestions.questionOrder),
+  );
+
+  return {
+    attempt,
+    questions: lockedQuestions,
+  };
+}
+
+export async function submitQuizAttempt(
+  attemptId: string,
+  userId: string,
+  answers: QuizAnswerInput[],
+) {
+  if (answers.length === 0) {
+    throw new Error("At least one answer is required.");
+  }
+
+  return withDb(async (db) =>
+    db.transaction(async (tx) => {
+      const attemptRows = await tx
+        .select({
+          id: quizAttempts.id,
+          userId: quizAttempts.userId,
+          testSize: quizAttempts.testSize,
+          status: quizAttempts.status,
+        })
+        .from(quizAttempts)
+        .where(eq(quizAttempts.id, attemptId))
+        .limit(1);
+
+      if (attemptRows.length === 0) {
+        throw new Error("Quiz attempt not found.");
+      }
+
+      const attempt = attemptRows[0];
+
+      if (attempt.userId !== userId) {
+        throw new Error("Access denied: You do not own this quiz attempt.");
+      }
+
+      if (attempt.status !== "in_progress") {
+        throw new Error("Quiz attempt has already been submitted.");
+      }
+
+      const lockedQuestions = await tx
+        .select({
+          id: questions.id,
+          correctOption: questions.correctOption,
+        })
+        .from(quizAttemptQuestions)
+        .innerJoin(questions, eq(quizAttemptQuestions.questionId, questions.id))
+        .where(eq(quizAttemptQuestions.attemptId, attemptId));
+
+      const lockedQuestionIds = new Set(lockedQuestions.map((question) => question.id));
+      const answerMap = new Map<string, QuizAnswerInput>();
+
+      for (const answer of answers) {
+        if (!lockedQuestionIds.has(answer.questionId)) {
+          throw new Error("Submitted answer does not belong to this attempt.");
+        }
+
+        answerMap.set(answer.questionId, answer);
+      }
+
+      if (answerMap.size !== lockedQuestions.length) {
+        throw new Error("Every locked question must be answered before submission.");
+      }
+
+      await tx.delete(studentAnswers).where(eq(studentAnswers.attemptId, attemptId));
+
+      const scoringRows = lockedQuestions.map((question) => {
+        const answer = answerMap.get(question.id);
+
+        if (!answer) {
+          throw new Error("Missing answer for locked question.");
+        }
+
+        return {
+          attemptId,
+          questionId: question.id,
+          selectedOption: answer.selectedOption,
+          isCorrect: answer.selectedOption === question.correctOption,
+        };
+      });
+
+      await tx.insert(studentAnswers).values(scoringRows);
+
+      const score = scoringRows.filter((row) => row.isCorrect).length;
+      const percentage = ((score / lockedQuestions.length) * 100).toFixed(2);
+      const submittedAt = new Date();
+
+      const [updated] = await tx
+        .update(quizAttempts)
+        .set({
+          score,
+          percentage,
+          status: "submitted",
+          submittedAt,
+        })
+        .where(eq(quizAttempts.id, attemptId))
+        .returning({
+          id: quizAttempts.id,
+          testSize: quizAttempts.testSize,
+          status: quizAttempts.status,
+          score: quizAttempts.score,
+          percentage: quizAttempts.percentage,
+          submittedAt: quizAttempts.submittedAt,
+        });
+
+      return {
+        attempt: updated,
+        answers: scoringRows.map((row) => ({
+          questionId: row.questionId,
+          selectedOption: row.selectedOption,
+          isCorrect: row.isCorrect,
+        })),
+      };
+    }),
+  );
+}
+
+export async function deleteQuizAttempts(attemptIds: string[]) {
+  if (attemptIds.length === 0) {
+    return;
+  }
+
+  await withDb((db) =>
+    db.delete(quizAttempts).where(inArray(quizAttempts.id, attemptIds)),
   );
 }
