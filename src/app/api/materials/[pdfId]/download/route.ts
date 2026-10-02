@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
 import { getCurrentUser } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { withDb } from "@/lib/db";
 import { courses, coursePdfs } from "@/lib/db/schema";
 import { isUuid } from "@/lib/materials";
 import { createPdfDownloadResponse } from "@/lib/r2/client";
@@ -59,26 +59,27 @@ async function authorizeMaterialDownload({ params }: DownloadRouteProps) {
     );
   }
 
-  const db = await getDb();
   // Look up PDF and its parent course with active/published status
-  const results = await db
-    .select({
-      id: coursePdfs.id,
-      title: coursePdfs.title,
-      r2ObjectKey: coursePdfs.r2ObjectKey,
-      isPublished: coursePdfs.isPublished,
-      courseActive: courses.isActive,
-    })
-    .from(coursePdfs)
-    .innerJoin(courses, eq(coursePdfs.courseId, courses.id))
-    .where(
-      and(
-        eq(coursePdfs.id, pdfId),
-        eq(coursePdfs.isPublished, true),
-        eq(courses.isActive, true),
-      ),
-    )
-    .limit(1);
+  const results = await withDb((db) =>
+    db
+      .select({
+        id: coursePdfs.id,
+        title: coursePdfs.title,
+        r2ObjectKey: coursePdfs.r2ObjectKey,
+        isPublished: coursePdfs.isPublished,
+        courseActive: courses.isActive,
+      })
+      .from(coursePdfs)
+      .innerJoin(courses, eq(coursePdfs.courseId, courses.id))
+      .where(
+        and(
+          eq(coursePdfs.id, pdfId),
+          eq(coursePdfs.isPublished, true),
+          eq(courses.isActive, true),
+        ),
+      )
+      .limit(1),
+  );
 
   if (results.length === 0) {
     return NextResponse.json(

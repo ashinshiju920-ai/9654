@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { getTrustedClientIdentity } from "@/lib/cloudflare/client-ip";
-import { getDb } from "@/lib/db";
+import { withDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import {
   checkAuthRateLimit,
@@ -41,13 +41,9 @@ export async function POST(request: Request) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const db = await getDb();
-
-  const userList = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, normalizedEmail))
-    .limit(1);
+  const userList = await withDb((db) =>
+    db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1),
+  );
 
   if (userList.length === 0) {
     return NextResponse.json(
@@ -76,11 +72,13 @@ export async function POST(request: Request) {
   await createSession(user.id);
 
   // Touch updated timestamp
-  void db
-    .update(users)
-    .set({ updatedAt: new Date() })
-    .where(eq(users.id, user.id))
-    .execute();
+  void withDb((db) =>
+    db
+      .update(users)
+      .set({ updatedAt: new Date() })
+      .where(eq(users.id, user.id))
+      .execute(),
+  );
 
   return NextResponse.json({
     success: true,

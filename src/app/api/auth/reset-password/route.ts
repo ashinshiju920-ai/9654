@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 
 import { hashPasswordAsync, invalidateAllUserSessions } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { withDb } from "@/lib/db";
 import { passwordResetTokens, users } from "@/lib/db/schema";
 
 export async function POST(request: Request) {
@@ -40,22 +40,22 @@ export async function POST(request: Request) {
 
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const now = new Date();
-  const db = await getDb();
-
-  const tokenRows = await db
-    .select({
-      id: passwordResetTokens.id,
-      userId: passwordResetTokens.userId,
-    })
-    .from(passwordResetTokens)
-    .where(
-      and(
-        eq(passwordResetTokens.tokenHash, tokenHash),
-        gt(passwordResetTokens.expiresAt, now),
-        isNull(passwordResetTokens.usedAt),
-      ),
-    )
-    .limit(1);
+  const tokenRows = await withDb((db) =>
+    db
+      .select({
+        id: passwordResetTokens.id,
+        userId: passwordResetTokens.userId,
+      })
+      .from(passwordResetTokens)
+      .where(
+        and(
+          eq(passwordResetTokens.tokenHash, tokenHash),
+          gt(passwordResetTokens.expiresAt, now),
+          isNull(passwordResetTokens.usedAt),
+        ),
+      )
+      .limit(1),
+  );
 
   if (tokenRows.length === 0) {
     return NextResponse.json(
@@ -68,22 +68,26 @@ export async function POST(request: Request) {
   const newPasswordHash = await hashPasswordAsync(password);
 
   // Update user's password
-  await db
-    .update(users)
-    .set({
-      passwordHash: newPasswordHash,
-      updatedAt: now,
-    })
-    .where(eq(users.id, tokenRow.userId));
+  await withDb((db) =>
+    db
+      .update(users)
+      .set({
+        passwordHash: newPasswordHash,
+        updatedAt: now,
+      })
+      .where(eq(users.id, tokenRow.userId)),
+  );
 
   // Invalidate all existing sessions upon password change
   await invalidateAllUserSessions(tokenRow.userId);
 
   // Mark token as used
-  await db
-    .update(passwordResetTokens)
-    .set({ usedAt: now })
-    .where(eq(passwordResetTokens.id, tokenRow.id));
+  await withDb((db) =>
+    db
+      .update(passwordResetTokens)
+      .set({ usedAt: now })
+      .where(eq(passwordResetTokens.id, tokenRow.id)),
+  );
 
   return NextResponse.json({ success: true });
 }

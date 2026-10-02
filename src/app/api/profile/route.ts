@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { requireUser } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { withDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
 export async function GET() {
@@ -13,19 +13,20 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = await getDb();
-  const userList = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      fullName: users.fullName,
-      role: users.role,
-      accountStatus: users.accountStatus,
-      createdAt: users.createdAt,
-    })
-    .from(users)
-    .where(eq(users.id, sessionUser.id))
-    .limit(1);
+  const userList = await withDb((db) =>
+    db
+      .select({
+        id: users.id,
+        email: users.email,
+        fullName: users.fullName,
+        role: users.role,
+        accountStatus: users.accountStatus,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.id, sessionUser.id))
+      .limit(1),
+  );
 
   if (userList.length === 0) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -58,21 +59,22 @@ export async function PATCH(request: Request) {
   // Only permit updating fullName - ignore or reject any attempts to update role/status/email
   const sanitizedName = typeof fullName === "string" ? fullName.trim() : null;
 
-  const db = await getDb();
-  const [updated] = await db
-    .update(users)
-    .set({
-      fullName: sanitizedName,
-      updatedAt: new Date(),
-    })
-    .where(eq(users.id, sessionUser.id))
-    .returning({
-      id: users.id,
-      email: users.email,
-      fullName: users.fullName,
-      role: users.role,
-      accountStatus: users.accountStatus,
-    });
+  const [updated] = await withDb((db) =>
+    db
+      .update(users)
+      .set({
+        fullName: sanitizedName,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, sessionUser.id))
+      .returning({
+        id: users.id,
+        email: users.email,
+        fullName: users.fullName,
+        role: users.role,
+        accountStatus: users.accountStatus,
+      }),
+  );
 
   return NextResponse.json({ success: true, profile: updated });
 }

@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 
 import { checkAuthRateLimit } from "@/lib/auth";
 import { getTrustedClientIdentity } from "@/lib/cloudflare/client-ip";
-import { getDb } from "@/lib/db";
+import { withDb } from "@/lib/db";
 import { passwordResetTokens, users } from "@/lib/db/schema";
 
 export async function POST(request: Request) {
@@ -37,13 +37,13 @@ export async function POST(request: Request) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const db = await getDb();
-
-  const userList = await db
-    .select({ id: users.id, accountStatus: users.accountStatus })
-    .from(users)
-    .where(eq(users.email, normalizedEmail))
-    .limit(1);
+  const userList = await withDb((db) =>
+    db
+      .select({ id: users.id, accountStatus: users.accountStatus })
+      .from(users)
+      .where(eq(users.email, normalizedEmail))
+      .limit(1),
+  );
 
   if (userList.length > 0 && userList[0].accountStatus === "active") {
     const user = userList[0];
@@ -51,11 +51,13 @@ export async function POST(request: Request) {
     const tokenHash = createHash("sha256").update(rawToken).digest("hex");
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    await db.insert(passwordResetTokens).values({
-      userId: user.id,
-      tokenHash,
-      expiresAt,
-    });
+    await withDb((db) =>
+      db.insert(passwordResetTokens).values({
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      }),
+    );
 
     // NOTE: Email sending integration is pending.
     // In production, sendEmail({ to: normalizedEmail, token: rawToken });

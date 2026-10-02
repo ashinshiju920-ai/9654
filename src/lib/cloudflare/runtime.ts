@@ -51,11 +51,10 @@ export async function isProductionRuntime(): Promise<boolean> {
 
 async function loadCloudflareEnv(): Promise<CloudflareWorkerEnv | null> {
   try {
-    const dynamicImport = new Function(
-      "specifier",
-      "return import(specifier)",
-    ) as (specifier: string) => Promise<{ env?: CloudflareWorkerEnv }>;
-    const runtime = await dynamicImport("cloudflare:workers");
+    const cloudflareWorkersSpecifier = "cloudflare:workers";
+    const runtime = (await import(
+      /* @vite-ignore */ cloudflareWorkersSpecifier
+    )) as { env?: CloudflareWorkerEnv };
     return runtime.env ?? null;
   } catch {
     return null;

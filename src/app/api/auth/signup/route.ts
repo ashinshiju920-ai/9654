@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { getRuntimeEnvValue } from "@/lib/cloudflare/runtime";
-import { getDb } from "@/lib/db";
+import { withDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { createSession, hashPasswordAsync } from "@/lib/auth";
 
@@ -42,8 +42,6 @@ export async function POST(request: Request) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const db = await getDb();
-
   // Basic email pattern check
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
     return NextResponse.json(
@@ -60,11 +58,9 @@ export async function POST(request: Request) {
   }
 
   // Check for existing user
-  const existing = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, normalizedEmail))
-    .limit(1);
+  const existing = await withDb((db) =>
+    db.select({ id: users.id }).from(users).where(eq(users.email, normalizedEmail)).limit(1),
+  );
 
   if (existing.length > 0) {
     return NextResponse.json(
@@ -76,21 +72,23 @@ export async function POST(request: Request) {
   const passwordHash = await hashPasswordAsync(password);
   const trimmedName = typeof fullName === "string" && fullName.trim() ? fullName.trim() : null;
 
-  const [newUser] = await db
-    .insert(users)
-    .values({
-      email: normalizedEmail,
-      passwordHash,
-      fullName: trimmedName,
-      role: "student",
-      accountStatus: "active",
-    })
-    .returning({
-      id: users.id,
-      email: users.email,
-      fullName: users.fullName,
-      role: users.role,
-    });
+  const [newUser] = await withDb((db) =>
+    db
+      .insert(users)
+      .values({
+        email: normalizedEmail,
+        passwordHash,
+        fullName: trimmedName,
+        role: "student",
+        accountStatus: "active",
+      })
+      .returning({
+        id: users.id,
+        email: users.email,
+        fullName: users.fullName,
+        role: users.role,
+      }),
+  );
 
   // Automatically log the student in by creating a session
   await createSession(newUser.id);

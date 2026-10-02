@@ -4,33 +4,34 @@ import { cache } from "react";
 import { and, desc, eq, asc } from "drizzle-orm";
 
 import type { CourseSlug } from "@/lib/courses";
-import { getDb } from "@/lib/db";
+import { withDb } from "@/lib/db";
 import { courses, coursePdfs } from "@/lib/db/schema";
 import type { PublishedPdf } from "@/lib/types";
 
 export const getPublishedPdfsForCourse = cache(
   async (courseSlug: CourseSlug): Promise<PublishedPdf[]> => {
     try {
-      const db = await getDb();
-      const rows = await db
-        .select({
-          id: coursePdfs.id,
-          title: coursePdfs.title,
-          description: coursePdfs.description,
-          fileSizeBytes: coursePdfs.fileSizeBytes,
-          mimeType: coursePdfs.mimeType,
-          createdAt: coursePdfs.createdAt,
-        })
-        .from(coursePdfs)
-        .innerJoin(courses, eq(coursePdfs.courseId, courses.id))
-        .where(
-          and(
-            eq(coursePdfs.isPublished, true),
-            eq(courses.slug, courseSlug),
-            eq(courses.isActive, true),
-          ),
-        )
-        .orderBy(asc(coursePdfs.displayOrder), desc(coursePdfs.createdAt));
+      const rows = await withDb((db) =>
+        db
+          .select({
+            id: coursePdfs.id,
+            title: coursePdfs.title,
+            description: coursePdfs.description,
+            fileSizeBytes: coursePdfs.fileSizeBytes,
+            mimeType: coursePdfs.mimeType,
+            createdAt: coursePdfs.createdAt,
+          })
+          .from(coursePdfs)
+          .innerJoin(courses, eq(coursePdfs.courseId, courses.id))
+          .where(
+            and(
+              eq(coursePdfs.isPublished, true),
+              eq(courses.slug, courseSlug),
+              eq(courses.isActive, true),
+            ),
+          )
+          .orderBy(asc(coursePdfs.displayOrder), desc(coursePdfs.createdAt)),
+      );
 
       return rows.map((pdf) => ({
         courseSlug,

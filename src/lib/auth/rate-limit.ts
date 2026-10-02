@@ -22,6 +22,7 @@ type RateLimitEntry = {
 };
 
 const attempts = new Map<string, RateLimitEntry>();
+let lastCleanupAt = 0;
 
 /**
  * Check whether a login attempt from the given IP should be allowed.
@@ -39,8 +40,12 @@ export async function checkAuthRateLimit(input: {
   const key = `${input.purpose}:${input.clientIdentity}${subject}`;
 
   if (limiter) {
-    const result = await limiter.limit({ key });
-    return result.success;
+    try {
+      const result = await limiter.limit({ key });
+      return result.success;
+    } catch {
+      return false;
+    }
   }
 
   if (cloudflareEnv) {
@@ -56,6 +61,7 @@ export function checkLoginRateLimit(ip: string): boolean {
 
 function checkLocalRateLimit(key: string): boolean {
   const now = Date.now();
+  cleanStaleEntries(now);
   const entry = attempts.get(key);
 
   if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
@@ -74,23 +80,18 @@ function checkLocalRateLimit(key: string): boolean {
 
 /**
  * Periodically clean stale entries to prevent memory leaks.
- * Called automatically on a 30-minute interval.
+ * Runs opportunistically so the module remains safe to load in Workers.
  */
-function cleanStaleEntries() {
-  const now = Date.now();
+function cleanStaleEntries(now: number) {
+  if (now - lastCleanupAt < RATE_LIMIT_WINDOW_MS) {
+    return;
+  }
+
+  lastCleanupAt = now;
 
   for (const [key, entry] of attempts) {
     if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
       attempts.delete(key);
     }
-  }
-}
-
-// Self-cleaning interval — runs as long as the process lives.
-if (typeof globalThis !== "undefined") {
-  const cleanupInterval = setInterval(cleanStaleEntries, 30 * 60 * 1000);
-  // Allow the process to exit even if this timer is active.
-  if (cleanupInterval.unref) {
-    cleanupInterval.unref();
   }
 }

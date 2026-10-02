@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Pool } from "pg";
+import { Client, Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -48,6 +48,25 @@ export async function getPool(): Promise<Pool> {
   }
 
   return cachedPool;
+}
+
+export async function withDb<T>(operation: (db: AppDatabase) => Promise<T>): Promise<T> {
+  const cloudflareEnv = await getCloudflareEnv();
+  const hyperdriveConnectionString = cloudflareEnv?.HYPERDRIVE?.connectionString;
+
+  if (hyperdriveConnectionString) {
+    const client = new Client({ connectionString: hyperdriveConnectionString });
+
+    await client.connect();
+
+    try {
+      return await operation(drizzle(client, { schema }));
+    } finally {
+      await client.end();
+    }
+  }
+
+  return operation(await getDb());
 }
 
 async function getDatabaseConnectionString() {

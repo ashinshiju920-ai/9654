@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { eq, and, gt, lt } from "drizzle-orm";
 
 import { isProductionRuntime } from "@/lib/cloudflare/runtime";
-import { getDb } from "@/lib/db";
+import { withDb } from "@/lib/db";
 import { sessions, users } from "@/lib/db/schema";
 
 /* ------------------------------------------------------------------ */
@@ -71,21 +71,22 @@ function hashToken(rawToken: string): string {
  * @returns The session row id.
  */
 export async function createSession(userId: string): Promise<string> {
-  const db = await getDb();
   const rawToken = generateSessionToken();
   const tokenHash = hashToken(rawToken);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
 
-  const [row] = await db
-    .insert(sessions)
-    .values({
-      userId,
-      tokenHash,
-      expiresAt,
-      lastUsedAt: now,
-    })
-    .returning({ id: sessions.id });
+  const [row] = await withDb((db) =>
+    db
+      .insert(sessions)
+      .values({
+        userId,
+        tokenHash,
+        expiresAt,
+        lastUsedAt: now,
+      })
+      .returning({ id: sessions.id }),
+  );
 
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, rawToken, {
@@ -120,23 +121,23 @@ export async function getCurrentSession(): Promise<{
 
   const tokenHash = hashToken(rawToken);
   const now = new Date();
-  const db = await getDb();
-
-  const result = await db
-    .select({
-      sessionId: sessions.id,
-      sessionExpiresAt: sessions.expiresAt,
-      sessionLastUsedAt: sessions.lastUsedAt,
-      userId: users.id,
-      userEmail: users.email,
-      userFullName: users.fullName,
-      userRole: users.role,
-      userAccountStatus: users.accountStatus,
-    })
-    .from(sessions)
-    .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
-    .limit(1);
+  const result = await withDb((db) =>
+    db
+      .select({
+        sessionId: sessions.id,
+        sessionExpiresAt: sessions.expiresAt,
+        sessionLastUsedAt: sessions.lastUsedAt,
+        userId: users.id,
+        userEmail: users.email,
+        userFullName: users.fullName,
+        userRole: users.role,
+        userAccountStatus: users.accountStatus,
+      })
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
+      .limit(1),
+  );
 
   if (result.length === 0) {
     return null;
@@ -151,11 +152,13 @@ export async function getCurrentSession(): Promise<{
 
   // Touch `last_used_at` if stale (fire-and-forget, don't block the response)
   if (now.getTime() - row.sessionLastUsedAt.getTime() > TOUCH_INTERVAL_MS) {
-    void db
-      .update(sessions)
-      .set({ lastUsedAt: now })
-      .where(eq(sessions.id, row.sessionId))
-      .execute();
+    void withDb((db) =>
+      db
+        .update(sessions)
+        .set({ lastUsedAt: now })
+        .where(eq(sessions.id, row.sessionId))
+        .execute(),
+    );
   }
 
   return {
@@ -183,8 +186,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
  * Also clears the session cookie.
  */
 export async function invalidateSession(sessionId: string): Promise<void> {
-  const db = await getDb();
-  await db.delete(sessions).where(eq(sessions.id, sessionId));
+  await withDb((db) => db.delete(sessions).where(eq(sessions.id, sessionId)));
 
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, "", {
@@ -200,8 +202,7 @@ export async function invalidateSession(sessionId: string): Promise<void> {
  * Invalidate ALL sessions for a user (e.g. password change, account compromise).
  */
 export async function invalidateAllUserSessions(userId: string): Promise<void> {
-  const db = await getDb();
-  await db.delete(sessions).where(eq(sessions.userId, userId));
+  await withDb((db) => db.delete(sessions).where(eq(sessions.userId, userId)));
 }
 
 /**
@@ -209,11 +210,12 @@ export async function invalidateAllUserSessions(userId: string): Promise<void> {
  * Intended to be called periodically (e.g. cron, or inline with low frequency).
  */
 export async function cleanExpiredSessions(): Promise<number> {
-  const db = await getDb();
-  const result = await db
-    .delete(sessions)
-    .where(lt(sessions.expiresAt, new Date()))
-    .returning({ id: sessions.id });
+  const result = await withDb((db) =>
+    db
+      .delete(sessions)
+      .where(lt(sessions.expiresAt, new Date()))
+      .returning({ id: sessions.id }),
+  );
 
   return result.length;
 }
