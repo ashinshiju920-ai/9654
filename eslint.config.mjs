@@ -5,7 +5,16 @@ const eslintConfig = [
   ...nextVitals,
   ...nextTypescript,
   {
-    ignores: [".cloudflare/**", ".next/**", ".open-next/**", ".vinext/**", ".wrangler/**", "dist/**", "next-env.d.ts"],
+    ignores: [
+      ".cloudflare/**",
+      ".codex-tools/**",
+      ".next/**",
+      ".open-next/**",
+      ".vinext/**",
+      ".wrangler/**",
+      "dist/**",
+      "next-env.d.ts",
+    ],
   },
 ];
 

@@ -31,7 +31,7 @@ let lastCleanupAt = 0;
  */
 export async function checkAuthRateLimit(input: {
   clientIdentity: string;
-  purpose: "login" | "password-reset" | "otp";
+  purpose: "login" | "forgot-password" | "password-reset" | "email-verification" | "otp";
   subject?: string;
 }): Promise<boolean> {
   const cloudflareEnv = await getCloudflareEnv();

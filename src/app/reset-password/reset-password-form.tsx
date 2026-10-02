@@ -37,7 +37,7 @@ export function ResetPasswordForm() {
     }
 
     if (!token.trim()) {
-      setMessage("A password reset token is required. (Email delivery integration is pending).");
+      setMessage("A password reset token is required.");
       return;
     }
 

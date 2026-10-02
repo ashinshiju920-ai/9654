@@ -11,6 +11,11 @@ export default defineConfig({
       ASSETS: bindings.assets(),
       NODE_ENV: bindings.text("production"),
       ALLOW_PUBLIC_SIGNUP: bindings.text("false"),
+      APP_BASE_URL: bindings.text("https://aylem-portal-preview.ashinshiju920.workers.dev"),
+      RESEND_FROM_EMAIL: bindings.text(
+        process.env.RESEND_FROM_EMAIL || "Aylem Learning <onboarding@resend.dev>",
+      ),
+      RESEND_API_KEY: bindings.secret(),
       HYPERDRIVE: bindings.hyperdrive({
         id: "569e5215cc774a4b8df2c054877f498f",
         dev: {

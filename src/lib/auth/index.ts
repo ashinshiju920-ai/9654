@@ -30,3 +30,9 @@ export {
   RATE_LIMIT_WINDOW_MS,
   RATE_LIMIT_MAX_ATTEMPTS,
 } from "./rate-limit";
+export {
+  generateAccountToken,
+  hashAccountToken,
+  safeAppPath,
+  validateNewPassword,
+} from "./account-lifecycle";

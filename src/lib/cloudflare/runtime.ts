@@ -24,6 +24,9 @@ export type CloudflareWorkerEnv = {
   MATERIALS_BUCKET?: R2BucketBinding;
   AUTH_RATE_LIMITER?: RateLimitBinding;
   ALLOW_PUBLIC_SIGNUP?: string;
+  APP_BASE_URL?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
   NODE_ENV?: string;
 };
 

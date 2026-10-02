@@ -13,3 +13,5 @@ tsconfig.tsbuildinfo
 .vinext/
 .cloudflare/
 .wrangler/
+.codex-tools/
+.codex-next-dev.log

@@ -1,25 +1,17 @@
 import { NextResponse } from "next/server";
-import { Buffer } from "node:buffer";
-import { randomBytes, createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
 
 import { checkAuthRateLimit } from "@/lib/auth";
+import {
+  GENERIC_FORGOT_PASSWORD_MESSAGE,
+  requestPasswordReset,
+} from "@/lib/auth/account-lifecycle-service";
+import { normalizeEmail } from "@/lib/auth/account-lifecycle";
 import { getTrustedClientIdentity } from "@/lib/cloudflare/client-ip";
-import { withDb } from "@/lib/db";
-import { passwordResetTokens, users } from "@/lib/db/schema";
 
 export async function POST(request: Request) {
   const clientIdentity = await getTrustedClientIdentity(request);
-
-  if (!(await checkAuthRateLimit({ clientIdentity, purpose: "password-reset" }))) {
-    return NextResponse.json({
-      success: true,
-      message:
-        "If an account exists with this email, password reset instructions will be sent. (Email delivery integration is currently pending).",
-    });
-  }
-
   let body: unknown;
+
   try {
     body = await request.json();
   } catch {
@@ -36,38 +28,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email address is required." }, { status: 400 });
   }
 
-  const normalizedEmail = email.trim().toLowerCase();
-  const userList = await withDb((db) =>
-    db
-      .select({ id: users.id, accountStatus: users.accountStatus })
-      .from(users)
-      .where(eq(users.email, normalizedEmail))
-      .limit(1),
-  );
+  const subject = normalizeEmail(email);
+  const allowed = await checkAuthRateLimit({
+    clientIdentity,
+    purpose: "forgot-password",
+    subject,
+  });
 
-  if (userList.length > 0 && userList[0].accountStatus === "active") {
-    const user = userList[0];
-    const rawToken = Buffer.from(randomBytes(32)).toString("hex");
-    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    await withDb((db) =>
-      db.insert(passwordResetTokens).values({
-        userId: user.id,
-        tokenHash,
-        expiresAt,
-      }),
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many password reset requests. Please try again later." },
+      { status: 429 },
     );
-
-    // NOTE: Email sending integration is pending.
-    // In production, sendEmail({ to: normalizedEmail, token: rawToken });
-    // Token is NEVER logged or returned to the client.
   }
 
-  // Return generic response to prevent email enumeration attacks
+  await requestPasswordReset(email, request.url);
+
   return NextResponse.json({
     success: true,
-    message:
-      "If an account exists with this email, password reset instructions will be sent. (Email delivery integration is currently pending).",
+    message: GENERIC_FORGOT_PASSWORD_MESSAGE,
   });
 }
