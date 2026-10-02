@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 
 import { getCurrentSession, type SessionUser } from "./session";
 
@@ -12,6 +13,25 @@ export async function requireUserOrRedirect(redirectTo = "/login"): Promise<Sess
 
   if (!result) {
     redirect(redirectTo);
+  }
+
+  return result.user;
+}
+
+/**
+ * Require an authenticated admin user or redirect.
+ *
+ * Specifically designed for Next.js Server Components in the /admin area.
+ */
+export async function requireAdminOrRedirect(redirectTo = "/login"): Promise<SessionUser> {
+  const result = await getCurrentSession();
+
+  if (!result) {
+    redirect(redirectTo);
+  }
+
+  if (result.user.role !== "admin") {
+    redirect("/dashboard?error=admin-required");
   }
 
   return result.user;
@@ -41,11 +61,39 @@ export async function requireUser(): Promise<SessionUser> {
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser();
 
+  if (user.accountStatus === "suspended") {
+    throw new AuthorizationError("Account is suspended.");
+  }
+
   if (user.role !== "admin") {
     throw new AuthorizationError("You do not have permission to access this resource.");
   }
 
   return user;
+}
+
+export async function requireAdminApi(): Promise<
+  { user: SessionUser; errorResponse?: never } | { user?: never; errorResponse: NextResponse }
+> {
+  try {
+    const user = await requireAdmin();
+    return { user };
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return {
+        errorResponse: NextResponse.json(
+          { error: "Forbidden: Admin access required." },
+          { status: 403 },
+        ),
+      };
+    }
+    return {
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized: Please log in." },
+        { status: 401 },
+      ),
+    };
+  }
 }
 
 /**

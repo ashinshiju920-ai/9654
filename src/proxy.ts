@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 const SESSION_COOKIE_NAME = "aylem_session";
 
 // Routes that require authentication
-const PROTECTED_PREFIXES = ["/dashboard", "/courses", "/profile", "/results"];
+const PROTECTED_PREFIXES = ["/admin", "/dashboard", "/courses", "/profile", "/results"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -38,6 +38,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/admin",
+    "/admin/:path*",
     "/dashboard/:path*",
     "/courses/:path*",
     "/profile/:path*",

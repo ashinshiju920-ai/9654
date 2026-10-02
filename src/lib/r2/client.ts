@@ -95,6 +95,79 @@ export async function createPdfDownloadResponse(objectKey: string, fileName: str
   return Response.redirect(await createPdfDownloadUrl(objectKey, fileName), 302);
 }
 
+export async function uploadPdfToR2(input: {
+  objectKey: string;
+  data: ArrayBuffer | Uint8Array | ReadableStream;
+  contentLength?: number;
+  contentType?: string;
+}): Promise<void> {
+  assertSafeR2ObjectKey(input.objectKey);
+
+  const cloudflareEnv = await getCloudflareEnv();
+  const bucket = cloudflareEnv?.MATERIALS_BUCKET;
+
+  if (bucket) {
+    await bucket.put(input.objectKey, input.data, {
+      httpMetadata: {
+        contentType: input.contentType || PDF_MIME_TYPE,
+      },
+    });
+    return;
+  }
+
+  // Local / VPS S3 fallback
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const config = getR2Config();
+  const client = await createR2Client();
+
+  let body = input.data;
+  if (body instanceof ReadableStream) {
+    // Convert stream to Buffer for AWS SDK if needed
+    const chunks: Uint8Array[] = [];
+    const reader = body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+    body = Buffer.concat(chunks);
+  }
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucketName,
+      Key: input.objectKey,
+      Body: body as Uint8Array,
+      ContentLength: input.contentLength,
+      ContentType: input.contentType || PDF_MIME_TYPE,
+    }),
+  );
+}
+
+export async function deletePdfFromR2(objectKey: string): Promise<void> {
+  assertSafeR2ObjectKey(objectKey);
+
+  const cloudflareEnv = await getCloudflareEnv();
+  const bucket = cloudflareEnv?.MATERIALS_BUCKET;
+
+  if (bucket) {
+    await bucket.delete(objectKey);
+    return;
+  }
+
+  // Local / VPS S3 fallback
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  const config = getR2Config();
+  const client = await createR2Client();
+
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: config.bucketName,
+      Key: objectKey,
+    }),
+  );
+}
+
 export async function createPdfUploadCommand(input: {
   body: Blob | ReadableStream | Uint8Array;
   contentLength: number;
@@ -153,4 +226,15 @@ function sanitizeUploadFileName(fileName: string) {
 function sanitizeDownloadFileName(fileName: string) {
   const safe = fileName.trim().replace(/[^a-zA-Z0-9._ -]+/g, "");
   return safe.toLowerCase().endsWith(".pdf") ? safe : `${safe || "study-material"}.pdf`;
+}
+
+export function validatePdfBytes(bytes: Uint8Array): boolean {
+  if (bytes.length < 5) return false;
+  return (
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46 &&
+    bytes[4] === 0x2d
+  );
 }

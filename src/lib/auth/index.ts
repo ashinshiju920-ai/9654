@@ -20,6 +20,8 @@ export {
   requireUser,
   requireUserOrRedirect,
   requireAdmin,
+  requireAdminOrRedirect,
+  requireAdminApi,
   hasRole,
   AuthenticationError,
   AuthorizationError,

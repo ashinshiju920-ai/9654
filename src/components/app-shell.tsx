@@ -41,6 +41,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     return <main className="public-shell">{children}</main>;
   }
 
+  if (pathname.startsWith("/admin")) {
+    return <div className="admin-root">{children}</div>;
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="Primary navigation">

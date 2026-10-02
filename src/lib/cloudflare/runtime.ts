@@ -17,6 +17,16 @@ export type R2ObjectBody = {
 
 export type R2BucketBinding = {
   get(key: string): Promise<R2ObjectBody | null>;
+  put(
+    key: string,
+    value: ArrayBuffer | ArrayBufferView | ReadableStream | string | Blob,
+    options?: {
+      httpMetadata?: {
+        contentType?: string;
+      };
+    }
+  ): Promise<unknown>;
+  delete(key: string | string[]): Promise<unknown>;
 };
 
 export type CloudflareWorkerEnv = {
