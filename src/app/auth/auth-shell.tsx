@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
+
 type AuthShellProps = {
   children: ReactNode;
   kicker: string;
@@ -12,11 +14,7 @@ export function AuthShell({ children, kicker, subtitle, title }: AuthShellProps)
     <div className="auth-page">
       <section className="auth-card auth-card--login">
         <div className="auth-brand-panel">
-          <div className="auth-logo">
-            <span>A</span>
-            <strong>Aylem</strong>
-            <small>Learning</small>
-          </div>
+          <BrandLogo className="auth-logo" />
           <h1>
             Learn
             <br />

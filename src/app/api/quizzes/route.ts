@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { getCourse } from "@/lib/courses";
 import { createQuizAttempt } from "@/lib/db/quiz";
+import { canUserAccessCourse } from "@/lib/entitlements";
 import { quizSizes } from "@/lib/quiz";
 import type { QuizSize } from "@/lib/types";
 
@@ -42,6 +43,14 @@ export async function POST(request: Request) {
   }
 
   try {
+    const canAccess = await canUserAccessCourse(user, courseSlug, "STANDARD");
+    if (!canAccess) {
+      return NextResponse.json(
+        { error: "You do not have access to this course." },
+        { status: 403 },
+      );
+    }
+
     const attempt = await createQuizAttempt(user.id, courseSlug, testSize);
     return NextResponse.json(attempt, { status: 201 });
   } catch (error) {

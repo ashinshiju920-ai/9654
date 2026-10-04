@@ -39,6 +39,21 @@ export function resetPasswordTemplate(input: ActionEmailInput): EmailTemplate {
   });
 }
 
+export function accountActivationTemplate(input: {
+  fullName?: string | null;
+  actionUrl: string;
+  courseName?: string | null;
+}): EmailTemplate {
+  const courseText = input.courseName ? ` for ${input.courseName}` : "";
+  return actionTemplate({
+    title: "Access your Aylem Learning Student Portal",
+    intro: `Thank you for your purchase! Your Aylem Learning order includes access to the Student Portal${courseText}${nameSuffix(input.fullName)}. Use the secure link below to set your password and access your materials and mock tests.`,
+    buttonText: "Set password & access portal",
+    actionUrl: input.actionUrl,
+    expires: "This activation link expires in 7 days.",
+  });
+}
+
 export function passwordChangedTemplate(input: {
   fullName?: string | null;
 }): EmailTemplate {

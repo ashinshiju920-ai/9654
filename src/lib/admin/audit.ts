@@ -18,12 +18,30 @@ export type AdminAuditAction =
   | "student.activate"
   | "student.suspend"
   | "student.role_change"
-  | "student.revoke_sessions";
+  | "student.revoke_sessions"
+  | "advanced_collection.create"
+  | "advanced_collection.update"
+  | "advanced_collection.delete"
+  | "advanced_question.create"
+  | "advanced_question.update"
+  | "advanced_question.delete"
+  | "advanced_question.bulk_import"
+  | "entitlement.grant"
+  | "entitlement.grant_idempotent_update"
+  | "entitlement.revoke";
 
 export type AdminAuditEntry = {
   adminUserId: string;
   action: AdminAuditAction;
-  targetType: "course" | "material" | "question" | "student" | "system";
+  targetType:
+    | "course"
+    | "material"
+    | "question"
+    | "student"
+    | "system"
+    | "advanced_collection"
+    | "advanced_question"
+    | "course_entitlement";
   targetId?: string | null;
   details?: string | null;
 };
@@ -40,21 +58,33 @@ export async function logAdminAudit(entry: AdminAuditEntry): Promise<void> {
 
   try {
     await withDb(async (db) => {
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS admin_audit_logs (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          admin_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-          action VARCHAR(64) NOT NULL,
-          target_type VARCHAR(64) NOT NULL,
-          target_id VARCHAR(128),
-          details TEXT,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-      `);
-      await db.execute(sql`
-        INSERT INTO admin_audit_logs (admin_user_id, action, target_type, target_id, details)
-        VALUES (${entry.adminUserId}, ${entry.action}, ${entry.targetType}, ${entry.targetId || null}, ${entry.details || null});
-      `);
+      try {
+        await db.execute(sql`
+          INSERT INTO admin_audit_logs (admin_user_id, action, target_type, target_id, details)
+          VALUES (${entry.adminUserId}, ${entry.action}, ${entry.targetType}, ${entry.targetId || null}, ${entry.details || null});
+        `);
+      } catch (insertErr: unknown) {
+        const msg = String(insertErr);
+        if (msg.includes("does not exist") || msg.includes("42P01")) {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS admin_audit_logs (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              admin_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+              action VARCHAR(64) NOT NULL,
+              target_type VARCHAR(64) NOT NULL,
+              target_id VARCHAR(128),
+              details TEXT,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+          `);
+          await db.execute(sql`
+            INSERT INTO admin_audit_logs (admin_user_id, action, target_type, target_id, details)
+            VALUES (${entry.adminUserId}, ${entry.action}, ${entry.targetType}, ${entry.targetId || null}, ${entry.details || null});
+          `);
+        } else {
+          throw insertErr;
+        }
+      }
     });
   } catch {
     // If table creation or insert fails, fallback to structured console log

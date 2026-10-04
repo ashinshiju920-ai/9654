@@ -370,7 +370,7 @@ export function StudentManager() {
               </div>
               <p style={{ color: 'var(--slate-500, #64748b)', fontSize: '0.8125rem', marginTop: '0.75rem' }}>
                 {statusModalTarget.accountStatus === 'active'
-                  ? 'Suspended accounts cannot log in, access private study materials, or take quizzes. Active sessions will be terminated.'
+                  ? 'Suspended accounts cannot log in, access private study materials, or take Mock Tests. Active sessions will be terminated.'
                   : 'Reactivating this account will restore standard login and portal access privileges.'}
               </p>
             </div>

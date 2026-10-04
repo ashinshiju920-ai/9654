@@ -6,7 +6,17 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Aylem Learning Student Portal",
-  description: "Student portal for Aylem Learning course materials and quizzes.",
+  description: "Student portal for Aylem Learning course materials and mock tests.",
+  icons: {
+    icon: [
+      {
+        url: "/newlogo.PNG",
+        type: "image/png",
+      },
+    ],
+    shortcut: "/newlogo.PNG",
+    apple: "/newlogo.PNG",
+  },
 };
 
 export default function RootLayout({

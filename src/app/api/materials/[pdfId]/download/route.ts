@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { withDb } from "@/lib/db";
 import { courses, coursePdfs } from "@/lib/db/schema";
+import { userHasCourseEntitlement } from "@/lib/entitlements";
 import { isUuid } from "@/lib/materials";
 import { createPdfDownloadResponse } from "@/lib/r2/client";
 
@@ -66,6 +67,7 @@ async function authorizeMaterialDownload({ params }: DownloadRouteProps) {
         id: coursePdfs.id,
         title: coursePdfs.title,
         r2ObjectKey: coursePdfs.r2ObjectKey,
+        courseId: courses.id,
         isPublished: coursePdfs.isPublished,
         courseActive: courses.isActive,
       })
@@ -88,5 +90,17 @@ async function authorizeMaterialDownload({ params }: DownloadRouteProps) {
     );
   }
 
-  return results[0];
+  const material = results[0];
+
+  if (user.role !== "admin") {
+    const allowed = await userHasCourseEntitlement(user.id, material.courseId, "STANDARD");
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "You do not have access to this course material." },
+        { status: 403 },
+      );
+    }
+  }
+
+  return material;
 }

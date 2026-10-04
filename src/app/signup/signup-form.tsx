@@ -3,12 +3,17 @@
 import { Lock, Mail, User } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui";
+import { safeAppPath } from "@/lib/auth/account-lifecycle";
 
-export function SignupForm() {
+export function SignupForm({ next: propNext }: { next?: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = propNext || searchParams.get("next");
+  const targetDestination = safeAppPath(nextParam, "/dashboard");
+
   const [confirmPassword, setConfirmPassword] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -54,10 +59,10 @@ export function SignupForm() {
       }
 
       setIsSuccess(true);
-      setMessage("Account created successfully! Redirecting to dashboard...");
+      setMessage("Account created successfully! Redirecting...");
 
       setTimeout(() => {
-        router.replace("/dashboard");
+        router.replace(targetDestination);
         router.refresh();
       }, 500);
     } catch {
@@ -65,6 +70,11 @@ export function SignupForm() {
       setIsLoading(false);
     }
   }
+
+  const loginHref =
+    targetDestination !== "/dashboard"
+      ? `/login?next=${encodeURIComponent(targetDestination)}`
+      : "/login";
 
   return (
     <form className="login-form" onSubmit={handleSignup}>
@@ -145,7 +155,7 @@ export function SignupForm() {
       </Button>
 
       <p className="login-form__support">
-        Already have an account? <Link href="/login">Log in.</Link>
+        Already have an account? <Link href={loginHref}>Log in.</Link>
       </p>
     </form>
   );

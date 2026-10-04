@@ -1,10 +1,10 @@
 import type { CourseSlug } from "./courses";
 
 export const courseAccents: Record<CourseSlug, string> = {
-  ielts: "#C8102E",
-  oet: "#0867E8",
-  pte: "#08A957",
-  german: "#111111",
+  ielts: "#DC5B6D",
+  oet: "#5BBF8F",
+  pte: "#5BA7E8",
+  german: "#E7C95A",
 };
 
 export function cn(...classes: Array<string | false | null | undefined>) {

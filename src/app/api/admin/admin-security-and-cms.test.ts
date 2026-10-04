@@ -180,10 +180,16 @@ describe("Bulk Question CSV Import & Security", () => {
     vi.mocked(withDb).mockImplementation(async (callback) => {
       const mockDb = {
         select: () => ({
-          from: () => mockCourses,
+          from: () => ({
+            where: () => [],
+            then: (resolve: (v: typeof mockCourses) => void) => resolve(mockCourses),
+            [Symbol.iterator]: function* () {
+              yield* mockCourses;
+            },
+          }),
         }),
       };
-      return (callback as (db: typeof mockDb) => unknown)(mockDb) as never;
+      return (callback as unknown as (db: typeof mockDb) => unknown)(mockDb) as never;
     });
   });
 

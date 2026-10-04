@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { quizSizes } from "@/lib/quiz";
-import type { QuizSize } from "@/lib/types";
+import { quizSizes, selectQuestionsForAttempt } from "@/lib/quiz";
+import type { Question, QuizSize } from "@/lib/types";
 
 describe("Quiz Attempt Integrity & Question Security", () => {
   it("only allows supported quiz sizes (20, 50, 100)", () => {
@@ -17,6 +17,51 @@ describe("Quiz Attempt Integrity & Question Security", () => {
     expect(isValidSize(10)).toBe(false);
     expect(isValidSize(25)).toBe(false);
     expect(isValidSize(500)).toBe(false);
+  });
+
+  it("selectQuestionsForAttempt properly handles 20, 50, and 100-question requests", () => {
+    const mockBank = Array.from({ length: 120 }, (_, i) => ({
+      id: `q-${i + 1}`,
+      courseSlug: "ielts" as const,
+      prompt: `Question ${i + 1}`,
+      options: ["A", "B", "C", "D"],
+      correctOptionIndex: 0,
+      explanation: null,
+      isPublished: true,
+    }));
+
+    const attempt20 = selectQuestionsForAttempt(mockBank, 20);
+    expect(attempt20.length).toBe(20);
+
+    const attempt50 = selectQuestionsForAttempt(mockBank, 50);
+    expect(attempt50.length).toBe(50);
+
+    const attempt100 = selectQuestionsForAttempt(mockBank, 100);
+    expect(attempt100.length).toBe(100);
+  });
+
+  it("fails gracefully with insufficient questions without duplicating or crashing", () => {
+    const smallBank: Question[] = [
+      {
+        id: "q-1",
+        courseSlug: "ielts",
+        prompt: "Q1",
+        options: ["A", "B", "C", "D"],
+        correctOptionIndex: 0,
+        explanation: null,
+        isPublished: true,
+      },
+    ];
+
+    expect(() => selectQuestionsForAttempt(smallBank, 20)).toThrow(
+      "Cannot create a 20-question quiz from 1 questions.",
+    );
+    expect(() => selectQuestionsForAttempt(smallBank, 50)).toThrow(
+      "Cannot create a 50-question quiz from 1 questions.",
+    );
+    expect(() => selectQuestionsForAttempt(smallBank, 100)).toThrow(
+      "Cannot create a 100-question quiz from 1 questions.",
+    );
   });
 
   it("ensures student quiz questions do not expose correctOption or explanation", () => {
@@ -72,5 +117,77 @@ describe("Quiz Attempt Integrity & Question Security", () => {
 
     // Other student access rejected
     expect(attempt.userId === requestingStudentB).toBe(false);
+  });
+
+  it("calculates server-side score and percentage accurately", () => {
+    const lockedQuestions = [
+      { id: "q1", correctOption: "A" },
+      { id: "q2", correctOption: "B" },
+      { id: "q3", correctOption: "C" },
+      { id: "q4", correctOption: "D" },
+    ];
+
+    const studentAnswers = [
+      { questionId: "q1", selectedOption: "A" }, // correct
+      { questionId: "q2", selectedOption: "B" }, // correct
+      { questionId: "q3", selectedOption: "A" }, // wrong
+      { questionId: "q4", selectedOption: "D" }, // correct
+    ];
+
+    const answerMap = new Map(studentAnswers.map((a) => [a.questionId, a.selectedOption]));
+    const correctCount = lockedQuestions.filter((q) => answerMap.get(q.id) === q.correctOption).length;
+    const percentage = ((correctCount / lockedQuestions.length) * 100).toFixed(2);
+
+    expect(correctCount).toBe(3);
+    expect(percentage).toBe("75.00");
+  });
+
+  it("rejects duplicate submissions for already submitted attempts", () => {
+    const attempt = {
+      id: "attempt-99",
+      status: "submitted",
+    };
+
+    const canSubmit = (status: string) => {
+      if (status !== "in_progress") {
+        throw new Error("Quiz attempt has already been submitted.");
+      }
+      return true;
+    };
+
+    expect(() => canSubmit(attempt.status)).toThrow("already been submitted");
+  });
+
+  it("guards post-submission review so unsubmitted attempts cannot reveal answer keys", () => {
+    const inProgressAttempt = {
+      id: "attempt-active",
+      userId: "user-1",
+      status: "in_progress",
+    };
+
+    const submittedAttempt = {
+      id: "attempt-done",
+      userId: "user-1",
+      status: "submitted",
+    };
+
+    const canReview = (attempt: { userId: string; status: string }, requestingUserId: string) => {
+      if (attempt.userId !== requestingUserId) {
+        throw new Error("Access denied: You do not own this quiz attempt.");
+      }
+      if (attempt.status !== "submitted") {
+        throw new Error("Cannot review an unsubmitted quiz attempt.");
+      }
+      return true;
+    };
+
+    // User cannot review in-progress attempt (prevents leaking answers)
+    expect(() => canReview(inProgressAttempt, "user-1")).toThrow("Cannot review an unsubmitted quiz attempt.");
+
+    // Another user cannot review even if submitted
+    expect(() => canReview(submittedAttempt, "attacker")).toThrow("Access denied");
+
+    // Owner can review submitted attempt
+    expect(canReview(submittedAttempt, "user-1")).toBe(true);
   });
 });

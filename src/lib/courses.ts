@@ -12,12 +12,12 @@ export const courses: Course[] = [
   {
     slug: "ielts",
     name: "IELTS",
-    description: "Preparation materials and quiz practice for IELTS students.",
+    description: "Preparation materials and mock test practice for IELTS students.",
   },
   {
     slug: "oet",
     name: "OET",
-    description: "Published PDFs and quiz practice for healthcare English preparation.",
+    description: "Published PDFs and mock test practice for healthcare English preparation.",
   },
   {
     slug: "pte",
@@ -27,7 +27,7 @@ export const courses: Course[] = [
   {
     slug: "german",
     name: "German",
-    description: "German language PDFs and quiz practice from the Aylem Learning team.",
+    description: "German language PDFs and mock test practice from the Aylem Learning team.",
   },
 ];
 

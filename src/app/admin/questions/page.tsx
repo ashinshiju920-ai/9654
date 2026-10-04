@@ -3,7 +3,7 @@ import { QuestionManager } from './question-manager';
 
 export const metadata = {
   title: 'Question Banks - Aylem Admin',
-  description: 'Manage practice quiz questions and bulk import CSV'
+  description: 'Manage Mock Test questions and bulk import CSV'
 };
 
 export default function QuestionsPage() {
@@ -14,7 +14,7 @@ export default function QuestionsPage() {
           Question Bank Management
         </h1>
         <p style={{ color: 'var(--slate-500, #64748b)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-          Create, edit, archive, and import questions for IELTS, OET, PTE, and German practice quizzes.
+          Create, edit, archive, and import questions for IELTS, OET, PTE, and German Mock Tests.
         </p>
       </div>
 

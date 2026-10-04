@@ -58,6 +58,7 @@ export function ForgotPasswordForm() {
             value={email}
           />
         </span>
+        <small className="login-field__hint">Use the email address from your purchase or enrollment.</small>
       </label>
 
       {message ? (
@@ -67,7 +68,7 @@ export function ForgotPasswordForm() {
       ) : null}
 
       <Button disabled={isLoading} type="submit">
-        {isLoading ? "Sending..." : "Send Reset Link"}
+        {isLoading ? "Sending..." : "Send Secure Link"}
       </Button>
 
       <p className="login-form__support">

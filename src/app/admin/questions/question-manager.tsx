@@ -37,6 +37,7 @@ interface CourseOption {
   id: string;
   title: string;
   slug: string;
+  questionCount?: number;
 }
 
 export function QuestionManager() {
@@ -268,6 +269,96 @@ export function QuestionManager() {
           <button onClick={() => setFeedback(null)} className="admin-alert-dismiss">×</button>
         </div>
       )}
+
+      {/* Question Bank Health Dashboard */}
+      <div style={{ marginBottom: '1.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--navy-900, #062a52)', margin: 0 }}>
+              Question Bank Health &amp; Mock Test Status
+            </h2>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--slate-500, #64748b)', margin: '0.2rem 0 0' }}>
+              Standard Question counts and automated mock test size availability (20 / 50 / 100 questions).
+            </p>
+          </div>
+          {selectedCourse !== 'all' && (
+            <button
+              onClick={() => { setSelectedCourse('all'); setPage(1); }}
+              className="admin-btn admin-btn-secondary admin-btn-sm"
+              style={{ fontSize: '0.75rem' }}
+            >
+              Clear Filter (Showing All)
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          {courses.map((c) => {
+            const count = c.questionCount ?? 0;
+            const has20 = count >= 20;
+            const has50 = count >= 50;
+            const has100 = count >= 100;
+            const isSelected = selectedCourse === c.id;
+
+            return (
+              <div
+                key={c.id}
+                onClick={() => {
+                  setSelectedCourse(isSelected ? 'all' : c.id);
+                  setPage(1);
+                }}
+                className={`admin-card ${isSelected ? 'admin-card-selected' : ''}`}
+                style={{
+                  cursor: 'pointer',
+                  padding: '1rem 1.25rem',
+                  border: isSelected ? '2px solid var(--teal-600, #0d9488)' : '1px solid var(--slate-200, #e2e8f0)',
+                  background: isSelected ? 'color-mix(in srgb, var(--teal-500) 8%, #ffffff)' : '#ffffff',
+                  boxShadow: isSelected ? '0 0 0 2px rgba(13, 148, 136, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--navy-900, #062a52)' }}>
+                    {c.title}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: '4px',
+                      background: 'var(--slate-100, #f1f5f9)',
+                      color: 'var(--slate-600, #475569)',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {c.slug}
+                  </span>
+                </div>
+
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--slate-500, #64748b)' }}>Total Standard Questions</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--navy-900, #062a52)', lineHeight: 1.2 }}>
+                    {count}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--slate-100, #f1f5f9)', paddingTop: '0.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                  <span style={{ color: has20 ? 'var(--teal-700, #0f766e)' : 'var(--slate-400)', fontWeight: 600 }}>
+                    20 {has20 ? '✓' : '✕'}
+                  </span>
+                  <span style={{ color: has50 ? 'var(--teal-700, #0f766e)' : 'var(--slate-400)', fontWeight: 600 }}>
+                    50 {has50 ? '✓' : '✕'}
+                  </span>
+                  <span style={{ color: has100 ? 'var(--teal-700, #0f766e)' : 'var(--slate-400)', fontWeight: 600 }}>
+                    100 {has100 ? '✓' : '✕'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Action Header */}
       <div className="admin-actions-bar">
@@ -665,7 +756,7 @@ export function QuestionManager() {
                 &ldquo;{deleteTarget.prompt.substring(0, 100)}...&rdquo;
               </div>
               <p style={{ color: 'var(--slate-500, #64748b)', fontSize: '0.8125rem', marginTop: '0.75rem' }}>
-                If students have already answered this question on past practice tests, the system will safely archive it instead of breaking historical quiz records.
+                If students have already answered this question on past Mock Tests, the system will safely archive it instead of breaking historical records.
               </p>
             </div>
             <div className="admin-modal-footer">

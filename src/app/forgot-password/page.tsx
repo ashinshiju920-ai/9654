@@ -4,9 +4,9 @@ import { ForgotPasswordForm } from "./forgot-password-form";
 export default function ForgotPasswordPage() {
   return (
     <AuthShell
-      kicker="Password Help"
-      subtitle="Enter your email to request a secure password reset link"
-      title="Reset Access"
+      kicker="Password Setup"
+      subtitle="Enter your purchase email and we'll send a secure link to create or reset your portal password."
+      title="Set Up Your Password"
     >
       <ForgotPasswordForm />
     </AuthShell>

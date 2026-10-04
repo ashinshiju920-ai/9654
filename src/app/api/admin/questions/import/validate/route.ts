@@ -4,6 +4,8 @@ import { requireAdminApi } from "@/lib/auth";
 import {
   parseCsvRows,
   validateQuestionsBatch,
+  MAX_IMPORT_BATCH_SIZE,
+  RECOMMENDED_IMPORT_BATCH_SIZE,
 } from "@/lib/admin/question-import";
 
 export async function POST(request: Request) {
@@ -23,15 +25,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
   }
 
-  const { csvText, questions: jsonRows } = body as {
+  const { csvText, csvContent, questions: jsonRows, courseSlug } = body as {
     csvText?: string;
+    csvContent?: string;
     questions?: Array<Record<string, string>>;
+    courseSlug?: string;
   };
+
+  const textToParse = (typeof csvText === "string" ? csvText : typeof csvContent === "string" ? csvContent : "").trim();
 
   let rowsToValidate: Array<Record<string, string>> = [];
 
-  if (typeof csvText === "string" && csvText.trim()) {
-    rowsToValidate = parseCsvRows(csvText);
+  if (textToParse) {
+    rowsToValidate = parseCsvRows(textToParse);
   } else if (Array.isArray(jsonRows)) {
     rowsToValidate = jsonRows;
   } else {
@@ -48,15 +54,17 @@ export async function POST(request: Request) {
     );
   }
 
-  if (rowsToValidate.length > 500) {
+  if (rowsToValidate.length > MAX_IMPORT_BATCH_SIZE) {
     return NextResponse.json(
-      { error: "Batch size exceeds the limit of 500 questions per import." },
+      {
+        error: `Batch size (${rowsToValidate.length}) exceeds the maximum limit of ${MAX_IMPORT_BATCH_SIZE} questions per import. Recommended batch size: ${RECOMMENDED_IMPORT_BATCH_SIZE} questions.`,
+      },
       { status: 400 },
     );
   }
 
   try {
-    const result = await validateQuestionsBatch(rowsToValidate);
+    const result = await validateQuestionsBatch(rowsToValidate, courseSlug);
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(

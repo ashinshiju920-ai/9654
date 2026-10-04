@@ -15,6 +15,27 @@
       "when": 1790949705522,
       "tag": "0001_chubby_wolverine",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791036249376,
+      "tag": "0002_right_colleen_wing",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791040165877,
+      "tag": "0003_parallel_miracleman",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791043422751,
+      "tag": "0004_ambiguous_purple_man",
+      "breakpoints": true
     }
   ]
 }

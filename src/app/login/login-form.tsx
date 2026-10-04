@@ -3,12 +3,17 @@
 import { Lock, Mail } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui";
+import { safeAppPath } from "@/lib/auth/account-lifecycle";
 
-export function LoginForm() {
+export function LoginForm({ next: propNext }: { next?: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = propNext || searchParams.get("next");
+  const targetDestination = safeAppPath(nextParam, "/dashboard");
+
   const [email, setEmail] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +39,7 @@ export function LoginForm() {
         return;
       }
 
-      router.replace("/dashboard");
+      router.replace(targetDestination);
       router.refresh();
     } catch {
       setErrorMessage("An error occurred connecting to the server. Please try again.");
@@ -42,9 +47,15 @@ export function LoginForm() {
     }
   }
 
-  function handleGoogleLogin() {
-    setErrorMessage("Google login is currently disabled. Please log in with your email and password.");
-  }
+  const forgotPasswordHref =
+    targetDestination !== "/dashboard"
+      ? `/forgot-password?next=${encodeURIComponent(targetDestination)}`
+      : "/forgot-password";
+
+  const signupHref =
+    targetDestination !== "/dashboard"
+      ? `/signup?next=${encodeURIComponent(targetDestination)}`
+      : "/signup";
 
   return (
     <form className="login-form" onSubmit={handleEmailLogin}>
@@ -62,10 +73,11 @@ export function LoginForm() {
             value={email}
           />
         </span>
+        <small className="login-field__hint">Use the same email address used for your purchase or enrollment.</small>
       </label>
 
       <label className="login-field">
-        <span>Password</span>
+        <span>Portal password</span>
         <span className="login-field__control">
           <Lock size={17} aria-hidden="true" />
           <input
@@ -80,9 +92,10 @@ export function LoginForm() {
         </span>
       </label>
 
-      <Link className="login-form__forgot" href="/forgot-password">
-        Forgot password?
-      </Link>
+      <div className="login-form__assist login-form__assist--setup">
+        <span>First time after purchase? Create your portal password with your purchase email.</span>
+        <Link href={forgotPasswordHref}>Set up password</Link>
+      </div>
 
       {errorMessage ? (
         <p className="login-form__error" role="alert">
@@ -94,19 +107,8 @@ export function LoginForm() {
         {isLoading ? "Logging in..." : "Log In"}
       </Button>
 
-      <div className="login-divider">
-        <span>or</span>
-      </div>
-
-      <Button onClick={handleGoogleLogin} type="button" variant="secondary">
-        <span className="google-mark" aria-hidden="true">
-          G
-        </span>
-        Continue with Google
-      </Button>
-
       <p className="login-form__support">
-        Don&apos;t have an account? <Link href="/signup">Create account.</Link>
+        Don&apos;t have an account yet? <Link href={signupHref}>Create an account.</Link>
       </p>
     </form>
   );

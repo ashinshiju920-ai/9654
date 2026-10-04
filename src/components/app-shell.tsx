@@ -4,6 +4,7 @@ import {
   BarChart3,
   BookOpen,
   CircleHelp,
+  Crown,
   GraduationCap,
   Home,
   LogOut,
@@ -14,18 +15,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { cn } from "@/lib/design";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/courses/ielts", label: "IELTS", icon: BookOpen },
-  { href: "/courses/oet", label: "OET", icon: BookOpen },
-  { href: "/courses/pte", label: "PTE", icon: BookOpen },
-  { href: "/courses/german", label: "German", icon: BookOpen },
-  { href: "/results", label: "My Results", icon: BarChart3 },
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/support", label: "Help & Support", icon: CircleHelp },
-  { href: "/logout", label: "Logout", icon: LogOut },
+  { href: "/dashboard", label: "Dashboard", icon: Home, tone: "dashboard" },
+  { href: "/courses/ielts", label: "IELTS", icon: BookOpen, tone: "ielts" },
+  { href: "/courses/oet", label: "OET", icon: BookOpen, tone: "oet" },
+  { href: "/courses/pte", label: "PTE", icon: BookOpen, tone: "pte" },
+  { href: "/courses/german", label: "German", icon: BookOpen, tone: "german" },
+  { href: "/advanced-mock-test", label: "Advanced", icon: Crown, tone: "advanced" },
+  { href: "/results", label: "My Results", icon: BarChart3, tone: "results" },
+  { href: "/profile", label: "Profile", icon: User, tone: "profile" },
+  { href: "/support", label: "Help & Support", icon: CircleHelp, tone: "support" },
+  { href: "/logout", label: "Logout", icon: LogOut, tone: "logout" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -49,11 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="sidebar" aria-label="Primary navigation">
         <Link className="sidebar__brand" href="/">
-          <span className="sidebar__brand-mark">A</span>
-          <span>
-            <strong>Aylem</strong>
-            <small>Learning</small>
-          </span>
+          <BrandLogo />
         </Link>
 
         <nav className="sidebar__nav">
@@ -70,7 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="mobile-topbar">
         <Link className="mobile-brand" href="/">
-          Aylem <span>Learning</span>
+          <BrandLogo compact />
         </Link>
         <button className="mobile-icon-button" type="button" aria-label="Open navigation">
           <Menu size={22} aria-hidden="true" />
@@ -80,7 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="app-main">{children}</main>
 
       <nav className="bottom-nav" aria-label="Mobile navigation">
-        {navItems.slice(0, 7).map((item) => (
+        {navItems.slice(0, 8).map((item) => (
           <ShellLink active={isActive(pathname, item.href)} compact key={item.href} {...item} />
         ))}
       </nav>
@@ -94,11 +93,18 @@ type ShellLinkProps = (typeof navItems)[number] & {
 };
 
 function ShellLink({ active, compact = false, href, icon: Icon, label }: ShellLinkProps) {
+  const item = navItems.find((navItem) => navItem.href === href);
+
   return (
     <Link
       aria-current={active ? "page" : undefined}
-      className={cn(compact ? "bottom-nav__link" : "sidebar__link", active && "is-active")}
+      className={cn(
+        compact ? "bottom-nav__link" : "sidebar__link",
+        compact && item && `bottom-nav__link--${item.tone}`,
+        active && "is-active",
+      )}
       href={href}
+      prefetch={false}
     >
       <Icon size={compact ? 19 : 18} aria-hidden="true" />
       <span>{label}</span>

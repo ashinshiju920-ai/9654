@@ -12,10 +12,13 @@ import {
 
 import { getAdminStats } from "@/lib/admin/queries";
 import { getRecentAuditLogs } from "@/lib/admin/audit";
+import { requireAdminOrRedirect } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  await requireAdminOrRedirect("/login?next=/admin");
+
   const [stats, auditLogs] = await Promise.all([
     getAdminStats(),
     getRecentAuditLogs(6),
@@ -97,7 +100,7 @@ export default async function AdminDashboardPage() {
             <TrendingUp size={22} />
           </div>
           <div className="admin-stat-card__data">
-            <span className="admin-stat-card__label">Quiz Attempts</span>
+            <span className="admin-stat-card__label">Mock Test Attempts</span>
             <strong className="admin-stat-card__value">{stats.totalAttempts}</strong>
             <span className="admin-stat-card__hint">
               Avg score: {stats.averageQuizScore}%

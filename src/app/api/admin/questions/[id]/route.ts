@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { requireAdminApi } from "@/lib/auth";
 import { withDb } from "@/lib/db";
-import { questions, studentAnswers } from "@/lib/db/schema";
+import { questions, studentAnswers, quizAttemptQuestions } from "@/lib/db/schema";
 import { isUuid } from "@/lib/materials";
 import { logAdminAudit } from "@/lib/admin/audit";
 
@@ -37,22 +37,16 @@ export async function PATCH(request: Request, props: QuestionRouteProps) {
     return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
   }
 
-  const {
-    questionText,
-    optionA,
-    optionB,
-    optionC,
-    optionD,
-    correctOption,
-    explanation,
-    isActive,
-  } = body as {
+  const payload = body as {
     questionText?: string;
+    prompt?: string;
     optionA?: string;
     optionB?: string;
     optionC?: string;
     optionD?: string;
+    options?: Array<{ id: string; text: string }>;
     correctOption?: string;
+    correctOptionId?: string;
     explanation?: string | null;
     isActive?: boolean;
   };
@@ -61,32 +55,50 @@ export async function PATCH(request: Request, props: QuestionRouteProps) {
     updatedAt: new Date(),
   };
 
-  if (typeof questionText === "string" && questionText.trim()) {
-    updates.questionText = questionText.trim();
+  const qText = payload.questionText || payload.prompt;
+  if (typeof qText === "string" && qText.trim()) {
+    updates.questionText = qText.trim();
   }
-  if (typeof optionA === "string" && optionA.trim()) {
-    updates.optionA = optionA.trim();
+
+  let optA = payload.optionA;
+  let optB = payload.optionB;
+  let optC = payload.optionC;
+  let optD = payload.optionD;
+
+  if (Array.isArray(payload.options)) {
+    for (const opt of payload.options) {
+      if (opt.id === "A" && optA === undefined) optA = opt.text;
+      if (opt.id === "B" && optB === undefined) optB = opt.text;
+      if (opt.id === "C" && optC === undefined) optC = opt.text;
+      if (opt.id === "D" && optD === undefined) optD = opt.text;
+    }
   }
-  if (typeof optionB === "string" && optionB.trim()) {
-    updates.optionB = optionB.trim();
+
+  if (typeof optA === "string" && optA.trim()) {
+    updates.optionA = optA.trim();
   }
-  if (typeof optionC === "string" && optionC.trim()) {
-    updates.optionC = optionC.trim();
+  if (typeof optB === "string" && optB.trim()) {
+    updates.optionB = optB.trim();
   }
-  if (typeof optionD === "string" && optionD.trim()) {
-    updates.optionD = optionD.trim();
+  if (typeof optC === "string" && optC.trim()) {
+    updates.optionC = optC.trim();
   }
-  if (typeof correctOption === "string") {
-    const optUpper = correctOption.trim().toUpperCase();
+  if (typeof optD === "string" && optD.trim()) {
+    updates.optionD = optD.trim();
+  }
+
+  const rawCorrect = payload.correctOption || payload.correctOptionId;
+  if (typeof rawCorrect === "string") {
+    const optUpper = rawCorrect.trim().toUpperCase();
     if (VALID_OPTIONS.has(optUpper)) {
       updates.correctOption = optUpper as "A" | "B" | "C" | "D";
     }
   }
-  if (explanation !== undefined) {
-    updates.explanation = explanation ? explanation.trim() : null;
+  if (payload.explanation !== undefined) {
+    updates.explanation = payload.explanation ? payload.explanation.trim() : null;
   }
-  if (typeof isActive === "boolean") {
-    updates.isActive = isActive;
+  if (typeof payload.isActive === "boolean") {
+    updates.isActive = payload.isActive;
   }
 
   try {
@@ -138,18 +150,25 @@ export async function DELETE(_request: Request, props: QuestionRouteProps) {
   }
 
   try {
-    // Check if the question is referenced in student answers
-    const hasAnswers = await withDb(async (db) => {
-      const rows = await db
+    // Check if the question is referenced in student answers or quiz attempts
+    const hasAttemptHistory = await withDb(async (db) => {
+      const answers = await db
         .select({ id: studentAnswers.id })
         .from(studentAnswers)
         .where(eq(studentAnswers.questionId, id))
         .limit(1);
-      return rows.length > 0;
+      if (answers.length > 0) return true;
+
+      const attemptQuestions = await db
+        .select({ id: quizAttemptQuestions.id })
+        .from(quizAttemptQuestions)
+        .where(eq(quizAttemptQuestions.questionId, id))
+        .limit(1);
+      return attemptQuestions.length > 0;
     });
 
-    if (hasAnswers) {
-      // Safely archive question instead of violating foreign keys on completed student attempts
+    if (hasAttemptHistory) {
+      // Safely archive question instead of violating foreign keys or breaking historical attempts
       await withDb((db) =>
         db
           .update(questions)
@@ -163,7 +182,7 @@ export async function DELETE(_request: Request, props: QuestionRouteProps) {
         action: "question.update",
         targetType: "question",
         targetId: id,
-        details: "Archived question (deactivated) due to existing historical student answers",
+        details: "Archived question (deactivated) due to existing historical student attempts/answers",
       });
 
       return NextResponse.json({

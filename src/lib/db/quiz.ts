@@ -338,3 +338,77 @@ export async function deleteQuizAttempts(attemptIds: string[]) {
     db.delete(quizAttempts).where(inArray(quizAttempts.id, attemptIds)),
   );
 }
+
+export type ReviewQuizQuestion = {
+  id: string;
+  order: number;
+  questionText: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correctOption: string;
+  explanation: string | null;
+  selectedOption: string | null;
+  isCorrect: boolean | null;
+};
+
+/**
+ * Retrieve post-submission answer review for an attempt.
+ *
+ * Enforces:
+ * 1. User ownership check (via getQuizAttempt)
+ * 2. Attempt must be 'submitted' (throws if in_progress or abandoned)
+ * 3. Never leaks correct answers or explanations prior to verified submission
+ */
+export async function getQuizAttemptReview(
+  attemptId: string,
+  userId: string,
+): Promise<{
+  attempt: NonNullable<Awaited<ReturnType<typeof getQuizAttempt>>>;
+  questions: ReviewQuizQuestion[];
+} | null> {
+  const attempt = await getQuizAttempt(attemptId, userId);
+
+  if (!attempt) {
+    return null;
+  }
+
+  if (attempt.status !== "submitted") {
+    throw new Error("Cannot review an unsubmitted quiz attempt.");
+  }
+
+  const reviewQuestions = await withDb((db) =>
+    db
+      .select({
+        id: questions.id,
+        order: quizAttemptQuestions.questionOrder,
+        questionText: questions.questionText,
+        optionA: questions.optionA,
+        optionB: questions.optionB,
+        optionC: questions.optionC,
+        optionD: questions.optionD,
+        correctOption: questions.correctOption,
+        explanation: questions.explanation,
+        selectedOption: studentAnswers.selectedOption,
+        isCorrect: studentAnswers.isCorrect,
+      })
+      .from(quizAttemptQuestions)
+      .innerJoin(questions, eq(quizAttemptQuestions.questionId, questions.id))
+      .leftJoin(
+        studentAnswers,
+        and(
+          eq(studentAnswers.attemptId, attemptId),
+          eq(studentAnswers.questionId, questions.id),
+        ),
+      )
+      .where(eq(quizAttemptQuestions.attemptId, attemptId))
+      .orderBy(quizAttemptQuestions.questionOrder),
+  );
+
+  return {
+    attempt,
+    questions: reviewQuestions,
+  };
+}
+

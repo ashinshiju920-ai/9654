@@ -7,25 +7,32 @@ import {
   FileText,
   FolderKanban,
   GraduationCap,
+  CreditCard,
   HelpCircle,
   History,
   LayoutDashboard,
   LogOut,
   Menu,
   ShieldCheck,
+  Sparkles,
   UploadCloud,
+  KeyRound,
   Users,
   X,
 } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { cn } from "@/lib/design";
 
 const adminNavItems = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/courses", label: "Courses", icon: FolderKanban },
   { href: "/admin/materials", label: "Study Materials", icon: FileText },
-  { href: "/admin/questions", label: "Question Bank", icon: HelpCircle },
-  { href: "/admin/questions/import", label: "Bulk CSV Import", icon: UploadCloud },
+  { href: "/admin/questions", label: "Standard Questions", icon: HelpCircle },
+  { href: "/admin/questions/import", label: "Standard CSV Import", icon: UploadCloud },
+  { href: "/admin/advanced", label: "Advanced Practice", icon: Sparkles },
+  { href: "/admin/entitlements", label: "Entitlements", icon: KeyRound },
+  { href: "/admin/commerce", label: "Commerce", icon: CreditCard },
   { href: "/admin/students", label: "Students", icon: Users },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: History },
 ];
@@ -44,11 +51,7 @@ export function AdminNav({
       <aside className="admin-sidebar" aria-label="Admin Navigation">
         <div className="admin-sidebar__header">
           <Link className="admin-sidebar__brand" href="/admin">
-            <span className="admin-sidebar__badge">ADMIN</span>
-            <div>
-              <strong>Aylem</strong>
-              <small>Portal Control</small>
-            </div>
+            <BrandLogo admin />
           </Link>
         </div>
 
@@ -76,6 +79,7 @@ export function AdminNav({
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 aria-current={active ? "page" : undefined}
                 className={cn("admin-sidebar__link", active && "is-active")}
               >
@@ -101,8 +105,7 @@ export function AdminNav({
       {/* Mobile Topbar */}
       <header className="admin-mobile-header">
         <Link className="admin-mobile-brand" href="/admin">
-          <span className="admin-sidebar__badge">ADMIN</span>
-          <span>Aylem Learning</span>
+          <BrandLogo admin compact />
         </Link>
 
         <button
@@ -141,6 +144,7 @@ export function AdminNav({
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={false}
                     onClick={() => setMobileOpen(false)}
                     className={cn("admin-sidebar__link", active && "is-active")}
                   >

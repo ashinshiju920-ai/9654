@@ -35,6 +35,12 @@ export type CloudflareWorkerEnv = {
   AUTH_RATE_LIMITER?: RateLimitBinding;
   ALLOW_PUBLIC_SIGNUP?: string;
   APP_BASE_URL?: string;
+  CASHFREE_ENVIRONMENT?: string;
+  CASHFREE_CLIENT_ID?: string;
+  CASHFREE_CLIENT_SECRET?: string;
+  CASHFREE_API_VERSION?: string;
+  MAIN_SITE_INTEGRATION_SECRET?: string;
+  MAIN_SITE_PRODUCT_COURSE_MAP?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   NODE_ENV?: string;

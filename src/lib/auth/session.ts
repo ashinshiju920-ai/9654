@@ -100,6 +100,8 @@ export async function createSession(userId: string): Promise<string> {
   return row.id;
 }
 
+const recentlyTouchedSessionIds = new Set<string>();
+
 /**
  * Read the session cookie, look up the session in the database,
  * and return the associated user if the session is valid.
@@ -150,15 +152,25 @@ export async function getCurrentSession(): Promise<{
     return null;
   }
 
-  // Touch `last_used_at` if stale (fire-and-forget, don't block the response)
-  if (now.getTime() - row.sessionLastUsedAt.getTime() > TOUCH_INTERVAL_MS) {
+  // Touch `last_used_at` if stale (fire-and-forget with in-memory debounce to prevent connection storms)
+  if (
+    now.getTime() - row.sessionLastUsedAt.getTime() > TOUCH_INTERVAL_MS &&
+    !recentlyTouchedSessionIds.has(row.sessionId)
+  ) {
+    recentlyTouchedSessionIds.add(row.sessionId);
+    setTimeout(() => {
+      recentlyTouchedSessionIds.delete(row.sessionId);
+    }, TOUCH_INTERVAL_MS);
+
     void withDb((db) =>
       db
         .update(sessions)
         .set({ lastUsedAt: now })
         .where(eq(sessions.id, row.sessionId))
         .execute(),
-    );
+    ).catch(() => {
+      recentlyTouchedSessionIds.delete(row.sessionId);
+    });
   }
 
   return {

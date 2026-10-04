@@ -32,7 +32,6 @@ export type AdminDashboardStats = {
 
 export async function getAdminStats(): Promise<AdminDashboardStats> {
   return withDb(async (db) => {
-    // 1. Student counts
     const [studentStats] = await db
       .select({
         total: count(users.id),
@@ -41,7 +40,6 @@ export async function getAdminStats(): Promise<AdminDashboardStats> {
       .from(users)
       .where(eq(users.role, "student"));
 
-    // 2. Published materials count
     const [materialsStats] = await db
       .select({
         total: count(coursePdfs.id),
@@ -49,14 +47,12 @@ export async function getAdminStats(): Promise<AdminDashboardStats> {
       })
       .from(coursePdfs);
 
-    // 3. Questions count
     const [questionsStats] = await db
       .select({
         total: count(questions.id),
       })
       .from(questions);
 
-    // 4. Attempts stats
     const [attemptStats] = await db
       .select({
         total: count(quizAttempts.id),
@@ -64,46 +60,43 @@ export async function getAdminStats(): Promise<AdminDashboardStats> {
       })
       .from(quizAttempts);
 
-    // 5. Course list with counts
-    const courseRows = await db
-      .select({
-        id: courses.id,
-        slug: courses.slug,
-        name: courses.name,
-        displayOrder: courses.displayOrder,
-        isActive: courses.isActive,
-      })
-      .from(courses)
-      .orderBy(asc(courses.displayOrder));
+    const courseSummariesResult = await db.execute(sql`
+      SELECT 
+        c.id, c.slug, c.name, c.display_order, c.is_active,
+        COALESCE(p.cnt, 0)::int as material_count,
+        COALESCE(q.cnt, 0)::int as question_count
+      FROM courses c
+      LEFT JOIN (
+        SELECT course_id, COUNT(*) as cnt FROM course_pdfs GROUP BY course_id
+      ) p ON p.course_id = c.id
+      LEFT JOIN (
+        SELECT course_id, COUNT(*) as cnt FROM questions GROUP BY course_id
+      ) q ON q.course_id = c.id
+      ORDER BY c.display_order ASC;
+    `);
 
-    const courseSummaries = await Promise.all(
-      courseRows.map(async (c) => {
-        const [pdfCount] = await db
-          .select({ count: count(coursePdfs.id) })
-          .from(coursePdfs)
-          .where(eq(coursePdfs.courseId, c.id));
-
-        const [qCount] = await db
-          .select({ count: count(questions.id) })
-          .from(questions)
-          .where(eq(questions.courseId, c.id));
-
-        return {
-          id: c.id,
-          slug: c.slug,
-          name: c.name,
-          displayOrder: c.displayOrder,
-          isActive: c.isActive,
-          materialCount: Number(pdfCount?.count || 0),
-          questionCount: Number(qCount?.count || 0),
-        };
-      }),
-    );
+    const courseSummaries = (courseSummariesResult.rows as Array<{
+      id: string;
+      slug: string;
+      name: string;
+      display_order: number;
+      is_active: boolean;
+      material_count: number;
+      question_count: number;
+    }>).map((r) => ({
+      id: String(r.id),
+      slug: String(r.slug),
+      name: String(r.name),
+      displayOrder: Number(r.display_order || 0),
+      isActive: Boolean(r.is_active),
+      materialCount: Number(r.material_count || 0),
+      questionCount: Number(r.question_count || 0),
+    }));
 
     return {
       totalStudents: Number(studentStats?.total || 0),
       activeStudents: Number(studentStats?.active || 0),
-      totalCourses: courseRows.length,
+      totalCourses: courseSummaries.length,
       publishedMaterials: Number(materialsStats?.published || 0),
       totalQuestions: Number(questionsStats?.total || 0),
       totalAttempts: Number(attemptStats?.total || 0),
@@ -248,7 +241,17 @@ export async function getAdminQuestions(options: {
     const conditions = [];
 
     if (options.courseSlug) {
-      conditions.push(eq(courses.slug, options.courseSlug));
+      const isCourseUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.courseSlug);
+      if (isCourseUuid) {
+        conditions.push(
+          or(
+            eq(courses.slug, options.courseSlug.toLowerCase()),
+            eq(courses.id, options.courseSlug),
+          ),
+        );
+      } else {
+        conditions.push(eq(courses.slug, options.courseSlug.toLowerCase()));
+      }
     }
     if (typeof options.isActive === "boolean") {
       conditions.push(eq(questions.isActive, options.isActive));
