@@ -58,9 +58,9 @@ describe("account lifecycle security helpers", () => {
 
   it("allows only same-application relative redirect destinations", () => {
     expect(safeAppPath("/dashboard?verified=1")).toBe("/dashboard?verified=1");
-    expect(safeAppPath("https://evil.example/phish")).toBe("/login");
-    expect(safeAppPath("//evil.example/phish")).toBe("/login");
-    expect(safeAppPath("/\\evil")).toBe("/login");
+    expect(safeAppPath("https://evil.example/phish")).toBe("/courses");
+    expect(safeAppPath("//evil.example/phish")).toBe("/courses");
+    expect(safeAppPath("/\\evil")).toBe("/courses");
   });
 
   it("builds action URLs without exposing tokens outside the URL destination", () => {

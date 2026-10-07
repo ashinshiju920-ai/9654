@@ -6,7 +6,7 @@ import { AdminNav } from "./admin-nav";
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const user = await requireAdminOrRedirect("/login?next=/admin");
+  const user = await requireAdminOrRedirect("/signup?next=/admin");
 
   return (
     <div className="admin-layout">

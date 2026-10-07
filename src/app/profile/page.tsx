@@ -5,7 +5,7 @@ import { requireUserOrRedirect } from "@/lib/auth";
 import { ProfileEditor } from "./profile-editor";
 
 export default async function ProfilePage() {
-  const user = await requireUserOrRedirect("/login");
+  const user = await requireUserOrRedirect("/signup?next=/profile");
 
   return (
     <div className="page">

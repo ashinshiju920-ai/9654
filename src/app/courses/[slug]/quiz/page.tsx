@@ -23,7 +23,9 @@ export default async function QuizPage({ params, searchParams }: QuizPageProps) 
     notFound();
   }
 
-  const user = await requireUserOrRedirect("/login");
+  const user = await requireUserOrRedirect(
+    `/signup?next=${encodeURIComponent(`/courses/${slug}/quiz`)}`,
+  );
 
   if (!(await canUserAccessCourse(user, course.slug, "STANDARD"))) {
     redirect("/dashboard?error=course-access-required");

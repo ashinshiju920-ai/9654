@@ -12,17 +12,17 @@ export async function GET(request: Request) {
   const clientIdentity = await getTrustedClientIdentity(request);
 
   if (!(await checkAuthRateLimit({ clientIdentity, purpose: "email-verification" }))) {
-    return redirectWithStatus(url, "/login?verified=rate-limited");
+    return redirectWithStatus(url, "/signup?verified=rate-limited");
   }
 
   if (!token) {
-    return redirectWithStatus(url, "/login?verified=invalid");
+    return redirectWithStatus(url, "/signup?verified=invalid");
   }
 
   const result = await verifyEmailToken(token);
 
   if (result.status !== "verified") {
-    return redirectWithStatus(url, "/login?verified=invalid");
+    return redirectWithStatus(url, "/signup?verified=invalid");
   }
 
   const destination = new URL(next, url.origin);

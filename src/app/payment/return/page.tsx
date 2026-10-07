@@ -14,7 +14,7 @@ type PaymentReturnPageProps = {
 };
 
 export default async function PaymentReturnPage({ searchParams }: PaymentReturnPageProps) {
-  const user = await requireUserOrRedirect("/login?next=/payment/return");
+  const user = await requireUserOrRedirect("/signup?next=/payment/return");
   const params = searchParams ? await searchParams : {};
   const providerOrderId = params.order_id?.trim();
 

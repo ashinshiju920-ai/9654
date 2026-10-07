@@ -6,7 +6,7 @@ import { formatMoneyMinor, listAdminCommerce } from "@/lib/commerce/service";
 export const dynamic = "force-dynamic";
 
 export default async function AdminCommercePage() {
-  await requireAdminOrRedirect("/login?next=/admin/commerce");
+  await requireAdminOrRedirect("/signup?next=/admin/commerce");
   const { products, orders, payments } = await listAdminCommerce();
 
   return (

@@ -41,7 +41,7 @@ describe("admin email test route", () => {
     });
 
     const res = await GET();
-    const json = await res.json();
+    const json = (await res.json()) as { configured: boolean; isSandboxFrom: boolean };
 
     expect(res.status).toBe(200);
     expect(json.configured).toBe(true);
@@ -66,7 +66,7 @@ describe("admin email test route", () => {
     });
 
     const res = await POST(req);
-    const json = await res.json();
+    const json = (await res.json()) as { success: boolean; id: string };
 
     expect(res.status).toBe(200);
     expect(json.success).toBe(true);
@@ -90,7 +90,7 @@ describe("admin email test route", () => {
     });
 
     const res = await POST(req);
-    const json = await res.json();
+    const json = (await res.json()) as { success: boolean; error: string };
 
     expect(res.status).toBe(400);
     expect(json.success).toBe(false);

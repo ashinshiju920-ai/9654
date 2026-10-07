@@ -3,11 +3,10 @@ import type { NextRequest } from "next/server";
 
 const SESSION_COOKIE_NAME = "aylem_session";
 
-// Routes that require authentication
+// Routes that strictly require authentication
 const PROTECTED_PREFIXES = [
   "/admin",
   "/dashboard",
-  "/courses",
   "/profile",
   "/results",
   "/advanced-mock-test",
@@ -15,12 +14,22 @@ const PROTECTED_PREFIXES = [
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
-  // Root redirect at the edge to avoid expensive SSR evaluation
+  // Root redirect at the edge: authenticated goes to dashboard, guest to public courses hub
   if (pathname === "/") {
-    const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-    const dest = sessionToken ? "/dashboard" : "/login";
+    const dest = sessionToken ? "/dashboard" : "/courses";
     return NextResponse.redirect(new URL(dest, request.url));
+  }
+
+  // Redirect legacy /login requests directly to /signup
+  if (pathname === "/login") {
+    if (sessionToken) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/signup";
+    return NextResponse.redirect(redirectUrl);
   }
 
   const isProtected = PROTECTED_PREFIXES.some(
@@ -28,19 +37,16 @@ export async function proxy(request: NextRequest) {
   );
 
   if (isProtected) {
-    const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-
     if (!sessionToken) {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/login";
+      redirectUrl.pathname = "/signup";
       redirectUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(redirectUrl);
     }
   }
 
-  // If authenticated user visits login or signup, redirect to dashboard
-  if (pathname === "/login" || pathname === "/signup") {
-    const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  // If authenticated user visits signup, redirect to dashboard
+  if (pathname === "/signup") {
     if (sessionToken) {
       const dashboardUrl = request.nextUrl.clone();
       dashboardUrl.pathname = "/dashboard";
@@ -59,8 +65,6 @@ export const config = {
     "/admin/:path*",
     "/dashboard",
     "/dashboard/:path*",
-    "/courses",
-    "/courses/:path*",
     "/profile",
     "/profile/:path*",
     "/results",

@@ -40,7 +40,9 @@ export default async function CoursePage({ params }: CoursePageProps) {
     notFound();
   }
 
-  const user = await requireUserOrRedirect("/login");
+  const user = await requireUserOrRedirect(
+    `/signup?next=${encodeURIComponent(`/courses/${slug}`)}`,
+  );
 
   if (!(await canUserAccessCourse(user, course.slug, "STANDARD"))) {
     redirect("/dashboard?error=course-access-required");

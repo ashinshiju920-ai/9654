@@ -72,7 +72,7 @@ export function ForgotPasswordForm() {
       </Button>
 
       <p className="login-form__support">
-        Remembered it? <Link href="/login">Log in.</Link>
+        Remembered it? <Link href="/signup">Sign in or create account.</Link>
       </p>
     </form>
   );

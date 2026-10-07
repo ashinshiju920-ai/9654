@@ -139,7 +139,7 @@ const deliverableItems = [
 ];
 
 export default async function AdvancedMockTestPage({ searchParams }: AdvancedMockTestPageProps) {
-  const user = await requireUserOrRedirect("/login");
+  const user = await requireUserOrRedirect("/signup?next=/advanced-mock-test");
 
   const resolvedParams = searchParams ? await searchParams : {};
   const selectedCourse = resolvedParams.course as CourseSlug | undefined;

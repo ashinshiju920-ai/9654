@@ -10,13 +10,10 @@ import {
   Trophy,
 } from "lucide-react";
 
-import { requireUserOrRedirect } from "@/lib/auth";
 import { courses } from "@/lib/courses";
 import { coursePresentations } from "@/lib/course-presentation";
 
-export default async function CoursesIndexPage() {
-  await requireUserOrRedirect("/login");
-
+export default function CoursesIndexPage() {
   return (
     <div className="courses-hub">
       {/* 1. Header Hero */}

@@ -6,7 +6,7 @@ import { formatMoneyMinor, listPurchasesForUser } from "@/lib/commerce/service";
 export const dynamic = "force-dynamic";
 
 export default async function PurchasesPage() {
-  const user = await requireUserOrRedirect("/login?next=/purchases");
+  const user = await requireUserOrRedirect("/signup?next=/purchases");
   const purchases = await listPurchasesForUser(user);
 
   return (

@@ -45,7 +45,7 @@ export function isTokenUsable(input: {
   return !input.usedAt && input.expiresAt.getTime() > now.getTime();
 }
 
-export function safeAppPath(candidate: string | null | undefined, fallback = "/login"): string {
+export function safeAppPath(candidate: string | null | undefined, fallback = "/courses"): string {
   if (!candidate) {
     return fallback;
   }

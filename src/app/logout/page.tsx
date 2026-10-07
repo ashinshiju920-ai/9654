@@ -15,7 +15,7 @@ export default function LogoutPage() {
       } catch (error) {
         console.error("Error during sign out:", error);
       } finally {
-        router.replace("/login");
+        router.replace("/courses");
         router.refresh();
       }
     }

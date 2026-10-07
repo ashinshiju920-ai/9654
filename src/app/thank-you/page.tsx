@@ -17,7 +17,7 @@ export default function ThankYouPage() {
           Thank you for your purchase. You can now access your learning materials in the Aylem
           Student Portal.
         </p>
-        <ButtonLink href="/login" size="lg">
+        <ButtonLink href="/dashboard" size="lg">
           Go to Student Portal
           <ArrowRight size={18} aria-hidden="true" />
         </ButtonLink>

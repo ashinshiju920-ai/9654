@@ -17,7 +17,7 @@ import { requireAdminOrRedirect } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  await requireAdminOrRedirect("/login?next=/admin");
+  await requireAdminOrRedirect("/signup?next=/admin");
 
   const [stats, auditLogs] = await Promise.all([
     getAdminStats(),

@@ -8,7 +8,7 @@ import { getCurrentSession, type SessionUser } from "./session";
  *
  * Specifically designed for Next.js Server Components.
  */
-export async function requireUserOrRedirect(redirectTo = "/login"): Promise<SessionUser> {
+export async function requireUserOrRedirect(redirectTo = "/signup"): Promise<SessionUser> {
   const result = await getCurrentSession();
 
   if (!result) {
@@ -23,7 +23,7 @@ export async function requireUserOrRedirect(redirectTo = "/login"): Promise<Sess
  *
  * Specifically designed for Next.js Server Components in the /admin area.
  */
-export async function requireAdminOrRedirect(redirectTo = "/login"): Promise<SessionUser> {
+export async function requireAdminOrRedirect(redirectTo = "/signup?next=/admin"): Promise<SessionUser> {
   const result = await getCurrentSession();
 
   if (!result) {

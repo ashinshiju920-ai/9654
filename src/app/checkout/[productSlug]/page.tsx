@@ -69,8 +69,8 @@ export default async function CheckoutProductPage({ params }: CheckoutPageProps)
   // 2. Authentication check: must belong to a known portal user
   const session = await getCurrentSession();
   if (!session) {
-    // Preserve product slug in redirect to resume post-login
-    redirect(`/login?next=${encodeURIComponent(`/checkout/${productSlug}`)}`);
+    // Preserve product slug in redirect to resume post-signup
+    redirect(`/signup?next=${encodeURIComponent(`/checkout/${productSlug}`)}`);
   }
 
   const user = session.user;

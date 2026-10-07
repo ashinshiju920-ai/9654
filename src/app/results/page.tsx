@@ -15,7 +15,7 @@ type ResultsPageProps = {
 };
 
 export default async function ResultsPage({ searchParams }: ResultsPageProps) {
-  const user = await requireUserOrRedirect("/login");
+  const user = await requireUserOrRedirect("/signup?next=/results");
   const history = await getUserQuizHistory(user.id).catch(() => []);
 
   const resolvedParams = searchParams ? await searchParams : {};

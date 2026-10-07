@@ -59,10 +59,10 @@ export function ResetPasswordForm() {
       }
 
       setIsSuccess(true);
-      setMessage("Password updated successfully! Redirecting to login...");
+      setMessage("Password updated successfully! Redirecting to sign in...");
 
       setTimeout(() => {
-        router.replace("/login");
+        router.replace("/signup?mode=signin");
       }, 1200);
     } catch {
       setIsLoading(false);
