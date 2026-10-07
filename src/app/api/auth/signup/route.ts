@@ -89,8 +89,8 @@ export async function POST(request: Request) {
       requestBaseUrl: request.url,
       next: "/dashboard",
     });
-  } catch {
-    // Signup remains open even if Resend is not configured or delivery fails.
+  } catch (err) {
+    console.error("[Signup] Email verification request failed:", err);
   }
 
   return NextResponse.json(

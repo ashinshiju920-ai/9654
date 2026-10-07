@@ -75,9 +75,12 @@ export async function requestPasswordReset(email: string, requestBaseUrl: string
   });
   const template = resetPasswordTemplate({ fullName: user.fullName, actionUrl });
   try {
-    await sendTransactionalEmail({ to: user.email, ...template });
-  } catch {
-    // Keep forgot-password enumeration-resistant even if the email provider fails.
+    const res = await sendTransactionalEmail({ to: user.email, ...template });
+    if (res.status === "skipped") {
+      console.warn(`[Auth] Password reset email skipped for ${user.email} (reason: ${res.reason})`);
+    }
+  } catch (err) {
+    console.error(`[Auth] Failed to send password reset email to ${user.email}:`, err);
   }
 }
 
@@ -134,9 +137,12 @@ export async function resetPasswordWithToken(input: {
   if (user) {
     const template = passwordChangedTemplate({ fullName: user.fullName });
     try {
-      await sendTransactionalEmail({ to: user.email, ...template });
-    } catch {
-      // Do not roll back a completed password reset if the confirmation email fails.
+      const res = await sendTransactionalEmail({ to: user.email, ...template });
+      if (res.status === "skipped") {
+        console.warn(`[Auth] Password changed email skipped for ${user.email} (reason: ${res.reason})`);
+      }
+    } catch (err) {
+      console.error(`[Auth] Failed to send password changed confirmation to ${user.email}:`, err);
     }
   }
 
@@ -178,9 +184,16 @@ export async function requestEmailVerification(input: {
     next: safeAppPath(input.next, "/dashboard"),
   });
   const template = verifyEmailTemplate({ fullName: user.fullName, actionUrl });
-  const result = await sendTransactionalEmail({ to: user.email, ...template });
-
-  return { status: result.status === "sent" ? "sent" : "email_not_configured" };
+  try {
+    const result = await sendTransactionalEmail({ to: user.email, ...template });
+    if (result.status === "skipped") {
+      console.warn(`[Auth] Verification email skipped for ${user.email} (reason: ${result.reason})`);
+    }
+    return { status: result.status === "sent" ? "sent" : "email_not_configured" };
+  } catch (err) {
+    console.error(`[Auth] Failed to send verification email to ${user.email}:`, err);
+    return { status: "email_not_configured" };
+  }
 }
 
 export async function verifyEmailToken(token: string): Promise<{

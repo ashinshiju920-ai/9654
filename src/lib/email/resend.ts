@@ -18,10 +18,12 @@ export type SendTransactionalEmailResult =
 export async function sendTransactionalEmail(
   input: SendTransactionalEmailInput,
 ): Promise<SendTransactionalEmailResult> {
-  const apiKey = await getRuntimeEnvValue("RESEND_API_KEY");
-  const from = await getRuntimeEnvValue("RESEND_FROM_EMAIL");
+  const apiKey = (await getRuntimeEnvValue("RESEND_API_KEY"))?.trim();
+  const configuredFrom = (await getRuntimeEnvValue("RESEND_FROM_EMAIL"))?.trim();
+  const from = configuredFrom || "Aylem Learning <onboarding@resend.dev>";
 
-  if (!apiKey || !from) {
+  if (!apiKey) {
+    console.warn("[Resend] Email delivery skipped: RESEND_API_KEY environment variable is missing.");
     return { status: "skipped", reason: "missing_config" };
   }
 
@@ -41,9 +43,37 @@ export async function sendTransactionalEmail(
   });
 
   if (!response.ok) {
-    throw new Error(`Resend email send failed with status ${response.status}.`);
+    const errorBody = await response.text().catch(() => "");
+    let errorMessage = `Resend API failed with HTTP ${response.status}.`;
+    try {
+      const parsed = JSON.parse(errorBody) as { message?: string; name?: string };
+      if (parsed.message) {
+        errorMessage = `Resend API error (${response.status} ${parsed.name || ""}): ${parsed.message}`;
+      }
+    } catch {
+      if (errorBody) errorMessage += ` ${errorBody}`;
+    }
+    console.error("[Resend]", errorMessage);
+    throw new Error(errorMessage);
   }
 
   const data = (await response.json()) as { id?: string };
+  console.log(`[Resend] Successfully sent email "${input.subject}" to ${input.to} (id: ${data.id})`);
   return { status: "sent", id: data.id ?? null };
+}
+
+export async function getResendStatus(): Promise<{
+  configured: boolean;
+  hasApiKey: boolean;
+  fromEmail: string;
+}> {
+  const apiKey = (await getRuntimeEnvValue("RESEND_API_KEY"))?.trim();
+  const configuredFrom = (await getRuntimeEnvValue("RESEND_FROM_EMAIL"))?.trim();
+  const from = configuredFrom || "Aylem Learning <onboarding@resend.dev>";
+
+  return {
+    configured: Boolean(apiKey),
+    hasApiKey: Boolean(apiKey),
+    fromEmail: from,
+  };
 }
