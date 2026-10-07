@@ -3,7 +3,7 @@ import { and, count, eq } from "drizzle-orm";
 
 import { invalidateAllUserSessions, requireAdminApi } from "@/lib/auth";
 import { withDb } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { commerceOrders, users } from "@/lib/db/schema";
 import { isUuid } from "@/lib/materials";
 import { logAdminAudit } from "@/lib/admin/audit";
 
@@ -165,6 +165,79 @@ export async function PATCH(request: Request, props: StudentRouteProps) {
         ...updated,
         updatedAt: updated.updatedAt.toISOString(),
       },
+    });
+  });
+}
+
+export async function DELETE(_request: Request, props: StudentRouteProps) {
+  const auth = await requireAdminApi();
+  if (auth.errorResponse) {
+    return auth.errorResponse;
+  }
+
+  const { id } = await props.params;
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: "Invalid user ID." }, { status: 400 });
+  }
+
+  return withDb(async (db) => {
+    const [targetUser] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        accountStatus: users.accountStatus,
+      })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+
+    if (!targetUser) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+
+    if (targetUser.email.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+      return NextResponse.json(
+        { error: "Action blocked: The permanent owner account cannot be removed." },
+        { status: 400 },
+      );
+    }
+
+    if (targetUser.id === auth.user.id) {
+      return NextResponse.json(
+        { error: "Action blocked: You cannot remove your own signed-in admin account." },
+        { status: 400 },
+      );
+    }
+
+    if (targetUser.role === "admin" && targetUser.accountStatus === "active") {
+      const [adminCountRow] = await db
+        .select({ count: count(users.id) })
+        .from(users)
+        .where(and(eq(users.role, "admin"), eq(users.accountStatus, "active")));
+
+      if (Number(adminCountRow?.count || 0) <= 1) {
+        return NextResponse.json(
+          { error: "Action blocked: Cannot remove the only remaining active admin." },
+          { status: 400 },
+        );
+      }
+    }
+
+    await db.delete(commerceOrders).where(eq(commerceOrders.userId, id));
+    await db.delete(users).where(eq(users.id, id));
+
+    await logAdminAudit({
+      adminUserId: auth.user.id,
+      action: "student.delete",
+      targetType: "student",
+      targetId: id,
+      details: `Deleted user account ${targetUser.email}`,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `${targetUser.email} has been removed.`,
     });
   });
 }

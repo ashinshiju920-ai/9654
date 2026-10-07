@@ -11,17 +11,18 @@ import {
   UserCheck,
   UserX,
   RefreshCw,
-  Crown
+  Crown,
+  Trash2,
+  UserCog
 } from 'lucide-react';
 
 interface StudentItem {
   id: string;
   email: string;
   role: 'student' | 'admin';
-  accountStatus: 'active' | 'suspended';
+  accountStatus: 'active' | 'suspended' | 'pending';
   emailVerified: boolean;
   createdAt: string;
-  lastLoginAt: string | null;
   activeSessionsCount: number;
   isOwner?: boolean;
 }
@@ -39,6 +40,8 @@ export function StudentManager() {
 
   // Confirmation Modals
   const [statusModalTarget, setStatusModalTarget] = useState<StudentItem | null>(null);
+  const [roleModalTarget, setRoleModalTarget] = useState<StudentItem | null>(null);
+  const [deleteModalTarget, setDeleteModalTarget] = useState<StudentItem | null>(null);
   const [revokeModalTarget, setRevokeModalTarget] = useState<StudentItem | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -142,6 +145,57 @@ export function StudentManager() {
     }
   };
 
+  const handleToggleRole = async () => {
+    if (!roleModalTarget) return;
+    setActionLoading(true);
+    const newRole = roleModalTarget.role === 'admin' ? 'student' : 'admin';
+
+    try {
+      const res = await fetch(`/api/admin/students/${roleModalTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to update role');
+
+      setFeedback({
+        type: 'success',
+        message: `${roleModalTarget.email} is now a ${newRole}.`
+      });
+      setRoleModalTarget(null);
+      fetchStudents();
+    } catch (err: unknown) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Error updating role' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteModalTarget) return;
+    setActionLoading(true);
+
+    try {
+      const res = await fetch(`/api/admin/students/${deleteModalTarget.id}`, {
+        method: 'DELETE'
+      });
+      const data = (await res.json()) as { error?: string; message?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to remove user');
+
+      setFeedback({
+        type: 'success',
+        message: data.message || `${deleteModalTarget.email} has been removed.`
+      });
+      setDeleteModalTarget(null);
+      fetchStudents();
+    } catch (err: unknown) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Error removing user' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const isOwnerAccount = (email: string) => email === 'ashinshiju920@gmail.com';
 
   return (
@@ -158,7 +212,7 @@ export function StudentManager() {
       <div className="admin-info-banner">
         <Shield size={18} style={{ color: 'var(--teal-600, #0d9488)', flexShrink: 0 }} />
         <span>
-          <strong>Security Notice:</strong> In accordance with security architecture, student passwords are never stored in plaintext and cannot be viewed. If a student requires password recovery, they should use the secure verification link on the login page.
+          <strong>Open access:</strong> Anyone can create a student account. Passwords are never stored in plaintext, and admins can activate, suspend, promote, demote, remove users, or revoke sessions here.
         </span>
       </div>
 
@@ -169,7 +223,7 @@ export function StudentManager() {
             <Search size={16} className="admin-search-icon" />
             <input
               type="text"
-              placeholder="Search by student email..."
+              placeholder="Search by user email or name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="admin-input admin-search-input"
@@ -233,12 +287,12 @@ export function StudentManager() {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th style={{ width: '32%' }}>User / Email</th>
+                  <th style={{ width: '30%' }}>User / Email</th>
                   <th style={{ width: '12%' }}>Role</th>
                   <th style={{ width: '12%' }}>Status</th>
                   <th style={{ width: '14%' }}>Email Verified</th>
                   <th style={{ width: '15%' }}>Active Sessions</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Actions</th>
+                  <th style={{ width: '17%', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,6 +360,7 @@ export function StudentManager() {
                           </span>
                           {student.activeSessionsCount > 0 && !isOwner && (
                             <button
+                              type="button"
                               onClick={() => setRevokeModalTarget(student)}
                               className="admin-link-btn"
                               title="Revoke all active sessions"
@@ -323,6 +378,7 @@ export function StudentManager() {
                         ) : (
                           <div className="admin-row-actions">
                             <button
+                              type="button"
                               onClick={() => setStatusModalTarget(student)}
                               className={`admin-btn admin-btn-sm ${
                                 student.accountStatus === 'active'
@@ -331,6 +387,22 @@ export function StudentManager() {
                               }`}
                             >
                               {student.accountStatus === 'active' ? 'Suspend' : 'Activate'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRoleModalTarget(student)}
+                              className="admin-icon-btn"
+                              title={student.role === 'admin' ? 'Make student' : 'Make admin'}
+                            >
+                              <UserCog size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteModalTarget(student)}
+                              className="admin-icon-btn admin-icon-btn-danger"
+                              title="Remove user"
+                            >
+                              <Trash2 size={15} />
                             </button>
                           </div>
                         )}
@@ -392,6 +464,104 @@ export function StudentManager() {
                 disabled={actionLoading}
               >
                 {actionLoading ? 'Processing...' : statusModalTarget.accountStatus === 'active' ? 'Confirm Suspend' : 'Confirm Activate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Role Change Confirmation Modal */}
+      {roleModalTarget && (
+        <div className="admin-modal-backdrop" onClick={() => !actionLoading && setRoleModalTarget(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="admin-modal-header">
+              <h3>{roleModalTarget.role === 'admin' ? 'Make User a Student' : 'Make User an Admin'}</h3>
+              <button
+                type="button"
+                onClick={() => setRoleModalTarget(null)}
+                className="admin-modal-close"
+                disabled={actionLoading}
+              >
+                Ã—
+              </button>
+            </div>
+            <div className="admin-modal-body">
+              <p style={{ color: 'var(--slate-700, #334155)', fontSize: '0.9375rem', marginBottom: '1rem' }}>
+                Change role for:
+              </p>
+              <div className="admin-confirm-target">
+                <strong>{roleModalTarget.email}</strong>
+              </div>
+              <p style={{ color: 'var(--slate-500, #64748b)', fontSize: '0.8125rem', marginTop: '0.75rem' }}>
+                {roleModalTarget.role === 'admin'
+                  ? 'This removes admin panel access and revokes current sessions.'
+                  : 'This grants admin panel access. Only give this to trusted staff.'}
+              </p>
+            </div>
+            <div className="admin-modal-footer">
+              <button
+                type="button"
+                onClick={() => setRoleModalTarget(null)}
+                className="admin-btn admin-btn-secondary"
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleRole}
+                className="admin-btn admin-btn-primary"
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Processing...' : roleModalTarget.role === 'admin' ? 'Make Student' : 'Make Admin'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {deleteModalTarget && (
+        <div className="admin-modal-backdrop" onClick={() => !actionLoading && setDeleteModalTarget(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="admin-modal-header">
+              <h3>Remove User</h3>
+              <button
+                type="button"
+                onClick={() => setDeleteModalTarget(null)}
+                className="admin-modal-close"
+                disabled={actionLoading}
+              >
+                Ã—
+              </button>
+            </div>
+            <div className="admin-modal-body">
+              <p style={{ color: 'var(--slate-700, #334155)', fontSize: '0.9375rem', marginBottom: '1rem' }}>
+                Permanently remove this user account:
+              </p>
+              <div className="admin-confirm-target">
+                <strong>{deleteModalTarget.email}</strong>
+              </div>
+              <p style={{ color: 'var(--slate-500, #64748b)', fontSize: '0.8125rem', marginTop: '0.75rem' }}>
+                Their sessions, quiz attempts, answers, and course access records will be deleted where the database relationship allows cascading.
+              </p>
+            </div>
+            <div className="admin-modal-footer">
+              <button
+                type="button"
+                onClick={() => setDeleteModalTarget(null)}
+                className="admin-btn admin-btn-secondary"
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteUser}
+                className="admin-btn admin-btn-danger"
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Removing...' : 'Confirm Remove'}
               </button>
             </div>
           </div>

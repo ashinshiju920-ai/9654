@@ -1,22 +1,12 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
-import { getRuntimeEnvValue } from "@/lib/cloudflare/runtime";
 import { withDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { createSession, hashPasswordAsync } from "@/lib/auth";
+import { requestEmailVerification } from "@/lib/auth/account-lifecycle-service";
 
 export async function POST(request: Request) {
-  if ((await getRuntimeEnvValue("ALLOW_PUBLIC_SIGNUP")) !== "true") {
-    return NextResponse.json(
-      {
-        error:
-          "Public registration is currently disabled. Student accounts are provisioned upon enrollment.",
-      },
-      { status: 403 },
-    );
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -92,6 +82,16 @@ export async function POST(request: Request) {
 
   // Automatically log the student in by creating a session
   await createSession(newUser.id);
+
+  try {
+    await requestEmailVerification({
+      userId: newUser.id,
+      requestBaseUrl: request.url,
+      next: "/dashboard",
+    });
+  } catch {
+    // Signup remains open even if Resend is not configured or delivery fails.
+  }
 
   return NextResponse.json(
     {

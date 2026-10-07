@@ -11,6 +11,7 @@ type QuizPageProps = {
   }>;
   searchParams?: Promise<{
     attemptId?: string;
+    tier?: string;
   }>;
 };
 
@@ -29,6 +30,13 @@ export default async function QuizPage({ params, searchParams }: QuizPageProps) 
   }
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
+
+  if (resolvedSearchParams.tier === "advanced") {
+    const hasAdvanced = await canUserAccessCourse(user, course.slug, "ADVANCED");
+    if (!hasAdvanced) {
+      redirect(`/advanced-mock-test?course=${course.slug}`);
+    }
+  }
 
   return (
     <QuizEngine

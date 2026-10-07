@@ -11,12 +11,13 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const search = url.searchParams.get("search") || undefined;
+  const role = url.searchParams.get("role") || undefined;
   const status = url.searchParams.get("status") || undefined;
   const page = parseInt(url.searchParams.get("page") || "1", 10) || 1;
   const limit = parseInt(url.searchParams.get("limit") || "20", 10) || 20;
 
   try {
-    const data = await getAdminStudents({ search, status, page, limit });
+    const data = await getAdminStudents({ search, role, status, page, limit });
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(

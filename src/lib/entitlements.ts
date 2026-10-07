@@ -44,6 +44,30 @@ export type EntitlementRecord = {
   updatedAt: Date;
 };
 
+type AdvancedCollectionAccessDecision =
+  | {
+      allowed: true;
+      reason: "allowed";
+      context: NonNullable<Awaited<ReturnType<typeof getAdvancedCollectionAccessContext>>>;
+    }
+  | {
+      allowed: false;
+      reason: "not_found" | "forbidden";
+      context: Awaited<ReturnType<typeof getAdvancedCollectionAccessContext>>;
+    };
+
+type AdvancedAttemptAccessDecision =
+  | {
+      allowed: true;
+      reason: "allowed";
+      context: NonNullable<Awaited<ReturnType<typeof getAdvancedAttemptAccessContext>>>;
+    }
+  | {
+      allowed: false;
+      reason: "not_found" | "forbidden";
+      context: Awaited<ReturnType<typeof getAdvancedAttemptAccessContext>>;
+    };
+
 export function isAccessTier(value: string): value is AccessTier {
   return accessTiers.includes(value as AccessTier);
 }
@@ -94,6 +118,11 @@ export async function userHasCourseEntitlement(
   requiredTier: AccessTier,
   now = new Date(),
 ) {
+  const course = await resolveCourse(courseId);
+  if (requiredTier === "STANDARD" && course?.isActive) {
+    return true;
+  }
+
   const rows = await withDb((db) =>
     db
       .select({
@@ -129,6 +158,27 @@ export async function userHasCourseEntitlement(
   });
 }
 
+export async function userHasAnyActiveAdvancedEntitlement(userId: string, now = new Date()) {
+  const rows = await withDb((db) =>
+    db
+      .select({
+        id: courseEntitlements.id,
+        status: courseEntitlements.status,
+        expiresAt: courseEntitlements.expiresAt,
+      })
+      .from(courseEntitlements)
+      .where(
+        and(
+          eq(courseEntitlements.userId, userId),
+          eq(courseEntitlements.accessTier, "ADVANCED"),
+          eq(courseEntitlements.status, "ACTIVE"),
+        ),
+      ),
+  );
+
+  return rows.some((row) => isEntitlementActive(row as Pick<EntitlementRecord, "status" | "expiresAt">, now));
+}
+
 export async function canUserAccessCourse(
   user: SessionUser,
   courseIdOrSlug: string,
@@ -139,7 +189,16 @@ export async function canUserAccessCourse(
   const course = await resolveCourse(courseIdOrSlug);
   if (!course || !course.isActive) return false;
 
-  return userHasCourseEntitlement(user.id, course.id, requiredTier);
+  if (requiredTier === "STANDARD") return true;
+
+  const hasDirect = await userHasCourseEntitlement(user.id, course.id, requiredTier);
+  if (hasDirect) return true;
+
+  if (requiredTier === "ADVANCED") {
+    return userHasAnyActiveAdvancedEntitlement(user.id);
+  }
+
+  return false;
 }
 
 export async function getAdvancedCollectionAccessContext(
@@ -181,7 +240,7 @@ export async function canUserAccessAdvancedCollection(
   user: SessionUser,
   collectionIdOrSlug: string,
   courseSlug?: string,
-) {
+): Promise<AdvancedCollectionAccessDecision> {
   const context = await getAdvancedCollectionAccessContext(collectionIdOrSlug, courseSlug);
   if (!context || !context.courseActive) {
     return { allowed: false as const, reason: "not_found" as const, context: null };
@@ -195,10 +254,21 @@ export async function canUserAccessAdvancedCollection(
     return { allowed: false as const, reason: "not_found" as const, context };
   }
 
-  const hasEntitlement = await userHasCourseEntitlement(user.id, context.courseId, "ADVANCED");
+  const hasEntitlement =
+    (await userHasCourseEntitlement(user.id, context.courseId, "ADVANCED")) ||
+    (await userHasAnyActiveAdvancedEntitlement(user.id));
+
+  if (hasEntitlement) {
+    return {
+      allowed: true as const,
+      reason: "allowed" as const,
+      context,
+    };
+  }
+
   return {
-    allowed: hasEntitlement,
-    reason: hasEntitlement ? ("allowed" as const) : ("forbidden" as const),
+    allowed: false as const,
+    reason: "forbidden" as const,
     context,
   };
 }
@@ -226,7 +296,10 @@ export async function getAdvancedAttemptAccessContext(attemptId: string) {
   return rows[0] || null;
 }
 
-export async function canUserAccessAdvancedAttempt(user: SessionUser, attemptId: string) {
+export async function canUserAccessAdvancedAttempt(
+  user: SessionUser,
+  attemptId: string,
+): Promise<AdvancedAttemptAccessDecision> {
   const context = await getAdvancedAttemptAccessContext(attemptId);
   if (!context) return { allowed: false as const, reason: "not_found" as const, context: null };
 
@@ -238,10 +311,21 @@ export async function canUserAccessAdvancedAttempt(user: SessionUser, attemptId:
     return { allowed: true as const, reason: "allowed" as const, context };
   }
 
-  const hasEntitlement = await userHasCourseEntitlement(user.id, context.courseId, "ADVANCED");
+  const hasEntitlement =
+    (await userHasCourseEntitlement(user.id, context.courseId, "ADVANCED")) ||
+    (await userHasAnyActiveAdvancedEntitlement(user.id));
+
+  if (hasEntitlement) {
+    return {
+      allowed: true as const,
+      reason: "allowed" as const,
+      context,
+    };
+  }
+
   return {
-    allowed: hasEntitlement,
-    reason: hasEntitlement ? ("allowed" as const) : ("forbidden" as const),
+    allowed: false as const,
+    reason: "forbidden" as const,
     context,
   };
 }

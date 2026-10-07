@@ -35,31 +35,31 @@ export default async function CheckoutProductPage({ params }: CheckoutPageProps)
 
   // 1. Authoritative product validation from DB
   const product = await getActiveProduct({ productSlug });
-  if (!product) {
+  if (!product || product.accessTier !== "ADVANCED") {
     return (
       <main className="page checkout-handoff-page">
         <section className="page-header">
           <div>
             <p className="page-kicker">Checkout</p>
-            <h1 className="page-title">Product Unavailable</h1>
+            <h1 className="page-title">Standard Access is Free</h1>
             <p className="page-subtitle">
-              The requested course product is not currently available in our catalogue.
+              Only the Advanced section requires payment. Standard mock tests and materials are free for all students.
             </p>
           </div>
         </section>
         <div className="payment-status-panel">
-          <AlertCircle size={32} aria-hidden="true" />
+          <CheckCircle2 size={32} aria-hidden="true" style={{ color: "var(--oet, #10b981)" }} />
           <div>
-            <h2>Product Not Found</h2>
-            <p>Please return to the courses list to choose an available product.</p>
+            <h2>No Payment Required for Standard Access</h2>
+            <p>You can access all standard course mock tests and study guides without any charge.</p>
           </div>
         </div>
         <div className="payment-return-actions">
           <Link className="dashboard-commercial-btn" href="/courses">
-            <span>Explore Courses</span>
+            <span>Explore Free Courses</span>
           </Link>
-          <Link className="dashboard-commercial-btn dashboard-commercial-btn--secondary" href="/dashboard">
-            <span>Back to Dashboard</span>
+          <Link className="dashboard-commercial-btn dashboard-commercial-btn--secondary" href="/advanced-mock-test">
+            <span>View Advanced Practice (₹299)</span>
           </Link>
         </div>
       </main>
@@ -106,8 +106,8 @@ export default async function CheckoutProductPage({ params }: CheckoutPageProps)
         </section>
 
         <div className="payment-return-actions">
-          <Link className="dashboard-commercial-btn" href={`/courses/${product.courseSlug}/quiz`}>
-            <span>Open Advanced Practice</span>
+          <Link className="dashboard-commercial-btn" href="/advanced-mock-test">
+            <span>Open Advanced Mock Tests</span>
           </Link>
           <Link className="dashboard-commercial-btn dashboard-commercial-btn--secondary" href={`/courses/${product.courseSlug}`}>
             <span>View {product.courseName} Hub</span>

@@ -29,6 +29,8 @@ import {
 
 export const orderStatuses = ["PENDING", "PAID", "FAILED", "CANCELLED"] as const;
 export type OrderStatus = (typeof orderStatuses)[number];
+export const ADVANCED_PRICE_AMOUNT_MINOR = 29900;
+export const ADVANCED_PRICE_CURRENCY = "INR";
 
 export type CheckoutProductIdentifier = {
   productSlug?: string;
@@ -50,14 +52,16 @@ export type ProductRow = {
 };
 
 export async function listActiveCommerceProducts() {
-  return withDb((db) =>
-    db
+  return withDb(async (db) => {
+    const rows = await db
       .select(productSelection)
       .from(commerceProducts)
       .innerJoin(courses, eq(commerceProducts.courseId, courses.id))
       .where(and(eq(commerceProducts.active, true), eq(courses.isActive, true)))
-      .orderBy(courses.displayOrder, commerceProducts.accessTier),
-  );
+      .orderBy(courses.displayOrder, commerceProducts.accessTier);
+
+    return rows.map(withAdvancedPricing);
+  });
 }
 
 export async function findActiveProductForCourseTier(courseSlug: string, accessTier: AccessTier) {
@@ -77,7 +81,7 @@ export async function findActiveProductForCourseTier(courseSlug: string, accessT
       )
       .limit(1),
   );
-  return rows[0] || null;
+  return rows[0] ? withAdvancedPricing(rows[0]) : null;
 }
 
 export async function getAdvancedCatalogueStateForUser(user: SessionUser) {
@@ -99,10 +103,9 @@ export async function getAdvancedCatalogueStateForUser(user: SessionUser) {
         ),
       );
 
-    const isAdmin = user.role === "admin";
     const activeCourseSlugsWithAccess = new Set<string>();
 
-    if (isAdmin) {
+    if (user.role === "admin") {
       for (const course of coursesList) {
         activeCourseSlugsWithAccess.add(course.slug);
       }
@@ -111,7 +114,6 @@ export async function getAdvancedCatalogueStateForUser(user: SessionUser) {
         .select({
           courseSlug: courses.slug,
           accessTier: courseEntitlements.accessTier,
-          status: courseEntitlements.status,
           expiresAt: courseEntitlements.expiresAt,
         })
         .from(courseEntitlements)
@@ -120,15 +122,22 @@ export async function getAdvancedCatalogueStateForUser(user: SessionUser) {
           and(
             eq(courseEntitlements.userId, user.id),
             eq(courseEntitlements.status, "ACTIVE"),
+            eq(courseEntitlements.accessTier, "ADVANCED"),
           ),
         );
 
       const now = new Date();
+      let hasAnyAdvanced = false;
       for (const ent of userEntitlements) {
         if (!ent.expiresAt || ent.expiresAt.getTime() > now.getTime()) {
-          if (ent.accessTier === "ADVANCED") {
-            activeCourseSlugsWithAccess.add(ent.courseSlug);
-          }
+          activeCourseSlugsWithAccess.add(ent.courseSlug);
+          hasAnyAdvanced = true;
+        }
+      }
+
+      if (hasAnyAdvanced) {
+        for (const course of coursesList) {
+          activeCourseSlugsWithAccess.add(course.slug);
         }
       }
     }
@@ -142,7 +151,9 @@ export async function getAdvancedCatalogueStateForUser(user: SessionUser) {
           course.slug,
           {
             productSlug: prod?.slug || null,
-            priceFormatted: prod ? formatMoneyMinor(prod.priceAmountMinor, prod.currency) : null,
+            priceFormatted: prod
+              ? formatMoneyMinor(ADVANCED_PRICE_AMOUNT_MINOR, ADVANCED_PRICE_CURRENCY)
+              : null,
             hasAccess: activeCourseSlugsWithAccess.has(course.slug),
           },
         ];
@@ -159,6 +170,14 @@ export async function createCheckoutSession(input: {
   const product = await getActiveProduct(input.product);
   if (!product) {
     return { ok: false as const, status: 404, error: "Product is not available." };
+  }
+
+  if (product.accessTier !== "ADVANCED") {
+    return {
+      ok: false as const,
+      status: 400,
+      error: "Only Advanced section requires payment. Standard access is free.",
+    };
   }
 
   if (
@@ -302,7 +321,7 @@ export async function listAdminCommerce() {
         .limit(100),
     ]);
 
-    return { products, orders, payments };
+    return { products: products.map(withAdvancedPricing), orders, payments };
   });
 }
 
@@ -474,22 +493,87 @@ export async function recordCashfreePayment(input: {
       })
       .where(and(eq(commerceOrders.id, row.order.id), ne(commerceOrders.status, "PAID")));
 
-    const entitlement = await grantEntitlement({
-      userId: row.order.userId,
-      courseId: row.product.courseId,
-      accessTier: row.product.accessTier as AccessTier,
-      source: "CASHFREE",
-      expiresAt: null,
-      externalReference: `cashfree:${input.providerOrderId}:${providerPaymentId}`,
-    });
+    let createdAny = false;
+    if (row.product.accessTier === "ADVANCED") {
+      const allActiveCourses = await db
+        .select({ id: courses.id, slug: courses.slug })
+        .from(courses)
+        .where(eq(courses.isActive, true));
+
+      for (const course of allActiveCourses) {
+        const ent = await grantEntitlement({
+          userId: row.order.userId,
+          courseId: course.id,
+          accessTier: "ADVANCED",
+          source: "CASHFREE",
+          expiresAt: null,
+          externalReference: `cashfree:${input.providerOrderId}:${providerPaymentId}:${course.slug}`,
+        });
+        if (ent.created) createdAny = true;
+      }
+    } else {
+      const ent = await grantEntitlement({
+        userId: row.order.userId,
+        courseId: row.product.courseId,
+        accessTier: row.product.accessTier as AccessTier,
+        source: "CASHFREE",
+        expiresAt: null,
+        externalReference: `cashfree:${input.providerOrderId}:${providerPaymentId}`,
+      });
+      if (ent.created) createdAny = true;
+    }
 
     return {
       processed: true,
       status: paymentStatus,
       entitlementGranted: true,
-      entitlementCreated: entitlement.created,
+      entitlementCreated: createdAny,
     };
   });
+}
+
+export async function verifyAndSyncCashfreeOrder(input: {
+  user: SessionUser;
+  providerOrderId: string;
+}) {
+  let order = await getOrderForUser({
+    user: input.user,
+    providerOrderId: input.providerOrderId,
+  });
+
+  if (!order) {
+    return null;
+  }
+
+  if (order.status === "PAID") {
+    return order;
+  }
+
+  try {
+    const verifiedPayments = await getCashfreeOrderPayments(input.providerOrderId);
+    if (Array.isArray(verifiedPayments) && verifiedPayments.length > 0) {
+      const successPayment = verifiedPayments.find(
+        (p) => normalizeCashfreeStatus(p.payment_status) === "SUCCESS",
+      );
+      const paymentToProcess = successPayment || verifiedPayments[verifiedPayments.length - 1];
+
+      if (paymentToProcess) {
+        await recordCashfreePayment({
+          providerOrderId: input.providerOrderId,
+          payment: paymentToProcess,
+        });
+
+        order = await getOrderForUser({
+          user: input.user,
+          providerOrderId: input.providerOrderId,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Failed to sync Cashfree payment on return:", error);
+  }
+
+  return order;
 }
 
 export async function getAppBaseUrl(request: Request) {
@@ -524,7 +608,7 @@ export async function getActiveProduct(identifier: CheckoutProductIdentifier): P
       .where(and(...conditions))
       .limit(1),
   );
-  return rows[0] || null;
+  return rows[0] ? withAdvancedPricing(rows[0]) : null;
 }
 
 const productSelection = {
@@ -566,6 +650,18 @@ const orderSelection = {
   createdAt: commerceOrders.createdAt,
   updatedAt: commerceOrders.updatedAt,
 };
+
+function withAdvancedPricing<T extends Pick<ProductRow, "accessTier" | "priceAmountMinor" | "currency">>(
+  product: T,
+): T {
+  if (product.accessTier !== "ADVANCED") return product;
+
+  return {
+    ...product,
+    priceAmountMinor: ADVANCED_PRICE_AMOUNT_MINOR,
+    currency: ADVANCED_PRICE_CURRENCY,
+  };
+}
 
 function createProviderOrderId() {
   return `aylem_${crypto.randomUUID().replaceAll("-", "").slice(0, 32)}`;

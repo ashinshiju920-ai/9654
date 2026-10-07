@@ -58,7 +58,7 @@ export function ForgotPasswordForm() {
             value={email}
           />
         </span>
-        <small className="login-field__hint">Use the email address from your purchase or enrollment.</small>
+        <small className="login-field__hint">Use the email address for your student account.</small>
       </label>
 
       {message ? (

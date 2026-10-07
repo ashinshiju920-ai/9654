@@ -73,7 +73,7 @@ export function LoginForm({ next: propNext }: { next?: string }) {
             value={email}
           />
         </span>
-        <small className="login-field__hint">Use the same email address used for your purchase or enrollment.</small>
+        <small className="login-field__hint">Use the email address for your student account.</small>
       </label>
 
       <label className="login-field">
@@ -93,8 +93,8 @@ export function LoginForm({ next: propNext }: { next?: string }) {
       </label>
 
       <div className="login-form__assist login-form__assist--setup">
-        <span>First time after purchase? Create your portal password with your purchase email.</span>
-        <Link href={forgotPasswordHref}>Set up password</Link>
+        <span>Need a new password? We can send a secure reset link to your email.</span>
+        <Link href={forgotPasswordHref}>Reset password</Link>
       </div>
 
       {errorMessage ? (

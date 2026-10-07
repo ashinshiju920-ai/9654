@@ -29,6 +29,7 @@ import { courses } from "@/lib/courses";
 type AdvancedMockTestPageProps = {
   searchParams?: Promise<{
     course?: string;
+    payment?: string;
   }>;
 };
 
@@ -153,6 +154,16 @@ export default async function AdvancedMockTestPage({ searchParams }: AdvancedMoc
         
         <div className="advanced-hero-section__inner">
           <div className="advanced-hero-header">
+            {resolvedParams.payment === "success" && (
+              <div className="advanced-payment-alert" role="status" aria-live="polite">
+                <CheckCircle2 size={20} color="#00a66d" aria-hidden="true" style={{ flexShrink: 0 }} />
+                <div>
+                  <strong>Payment Successful!</strong>
+                  <span> Your ₹299 payment was confirmed via Cashfree. Advanced Practice Mock Tests are now unlocked for all courses.</span>
+                </div>
+              </div>
+            )}
+
             <div className="advanced-kicker-pill">
               <Sparkles size={14} aria-hidden="true" />
               <span>ADVANCED PRACTICE</span>

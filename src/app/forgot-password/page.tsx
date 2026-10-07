@@ -5,7 +5,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthShell
       kicker="Password Setup"
-      subtitle="Enter your purchase email and we'll send a secure link to create or reset your portal password."
+      subtitle="Enter your account email and we'll send a secure link to create or reset your portal password."
       title="Set Up Your Password"
     >
       <ForgotPasswordForm />

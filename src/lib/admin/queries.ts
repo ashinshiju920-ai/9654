@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 
 import { withDb } from "@/lib/db";
 import {
@@ -8,6 +8,7 @@ import {
   courses,
   questions,
   quizAttempts,
+  sessions,
   users,
 } from "@/lib/db/schema";
 
@@ -328,10 +329,12 @@ export type AdminStudentItem = {
   updatedAt: string;
   quizAttemptsCount: number;
   lastAttemptAt: string | null;
+  activeSessionsCount: number;
 };
 
 export async function getAdminStudents(options: {
   search?: string;
+  role?: string;
   status?: string;
   page?: number;
   limit?: number;
@@ -351,6 +354,9 @@ export async function getAdminStudents(options: {
 
     if (options.status) {
       conditions.push(eq(users.accountStatus, options.status));
+    }
+    if (options.role) {
+      conditions.push(eq(users.role, options.role));
     }
     if (options.search && options.search.trim()) {
       const pattern = `%${options.search.trim()}%`;
@@ -396,6 +402,13 @@ export async function getAdminStudents(options: {
         .from(quizAttempts)
         .where(eq(quizAttempts.userId, u.id));
 
+      const [sessionSummary] = await db
+        .select({
+          count: count(sessions.id),
+        })
+        .from(sessions)
+        .where(and(eq(sessions.userId, u.id), gt(sessions.expiresAt, new Date())));
+
       students.push({
         id: u.id,
         email: u.email,
@@ -409,6 +422,7 @@ export async function getAdminStudents(options: {
         lastAttemptAt: attemptSummary?.lastAttempt
           ? new Date(attemptSummary.lastAttempt).toISOString()
           : null,
+        activeSessionsCount: Number(sessionSummary?.count || 0),
       });
     }
 

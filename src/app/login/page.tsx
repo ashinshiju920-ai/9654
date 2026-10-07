@@ -12,7 +12,7 @@ export default async function LoginPage({
   return (
     <AuthShell
       kicker="Student Portal Login"
-      subtitle="Use your purchase email to log in, or set up your portal password if this is your first visit."
+      subtitle="Sign in with any email account you used to create your student profile."
       title="Welcome Back"
     >
       <LoginForm next={params.next} />

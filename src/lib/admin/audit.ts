@@ -18,6 +18,7 @@ export type AdminAuditAction =
   | "student.activate"
   | "student.suspend"
   | "student.role_change"
+  | "student.delete"
   | "student.revoke_sessions"
   | "advanced_collection.create"
   | "advanced_collection.update"
