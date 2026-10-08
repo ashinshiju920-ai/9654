@@ -3,7 +3,7 @@ import { and, count, eq } from "drizzle-orm";
 
 import { invalidateAllUserSessions, requireAdminApi } from "@/lib/auth";
 import { withDb } from "@/lib/db";
-import { commerceOrders, users } from "@/lib/db/schema";
+import { commerceOrders, commercePayments, users } from "@/lib/db/schema";
 import { isUuid } from "@/lib/materials";
 import { logAdminAudit } from "@/lib/admin/audit";
 
@@ -224,6 +224,7 @@ export async function DELETE(_request: Request, props: StudentRouteProps) {
       }
     }
 
+    await db.delete(commercePayments).where(eq(commercePayments.userId, id));
     await db.delete(commerceOrders).where(eq(commerceOrders.userId, id));
     await db.delete(users).where(eq(users.id, id));
 

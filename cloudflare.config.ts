@@ -6,11 +6,12 @@ export default defineConfig({
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-01",
     compatibilityFlags: ["nodejs_compat"],
+    observability: { enabled: true },
     assets: { notFoundHandling: "none" },
     env: {
       ASSETS: bindings.assets(),
       NODE_ENV: bindings.text("production"),
-      ALLOW_PUBLIC_SIGNUP: bindings.text("false"),
+      ALLOW_PUBLIC_SIGNUP: bindings.text("true"),
       APP_BASE_URL: bindings.text("https://portal.aylemlearning.online"),
       CASHFREE_ENVIRONMENT: bindings.text("PRODUCTION"),
       CASHFREE_API_VERSION: bindings.text("2026-01-01"),
@@ -34,7 +35,7 @@ export default defineConfig({
       AUTH_RATE_LIMITER: bindings.rateLimit({
         namespace: process.env.CLOUDFLARE_AUTH_RATE_LIMIT_NAMESPACE || "1001",
         simple: {
-          limit: 10,
+          limit: 60,
           period: 60,
         },
       }),
