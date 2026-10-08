@@ -1,23 +1,34 @@
 import { NextResponse } from "next/server";
 
 import { checkAuthRateLimit, getCurrentSession } from "@/lib/auth";
-import { requestEmailVerification } from "@/lib/auth/account-lifecycle-service";
+import {
+  requestEmailVerification,
+  requestEmailVerificationByEmail,
+} from "@/lib/auth/account-lifecycle-service";
 import { getTrustedClientIdentity } from "@/lib/cloudflare/client-ip";
 
 export async function POST(request: Request) {
   const current = await getCurrentSession();
+  const clientIdentity = await getTrustedClientIdentity(request);
 
-  if (!current) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let email: string | null = null;
+  let next: string | null = null;
+  try {
+    const body = (await request.json()) as { email?: unknown; next?: unknown };
+    email = typeof body.email === "string" ? body.email.trim().toLowerCase() : null;
+    next = typeof body.next === "string" ? body.next : null;
+  } catch {
+    email = null;
+    next = null;
   }
 
-  const clientIdentity = await getTrustedClientIdentity(request);
+  const subject = current?.user.id || email || clientIdentity;
 
   if (
     !(await checkAuthRateLimit({
       clientIdentity,
       purpose: "email-verification",
-      subject: current.user.id,
+      subject,
     }))
   ) {
     return NextResponse.json(
@@ -26,22 +37,25 @@ export async function POST(request: Request) {
     );
   }
 
-  let next: string | null = null;
-  try {
-    const body = (await request.json()) as { next?: unknown };
-    next = typeof body.next === "string" ? body.next : null;
-  } catch {
-    next = null;
-  }
-
-  const result = await requestEmailVerification({
-    userId: current.user.id,
-    requestBaseUrl: request.url,
-    next,
-  });
+  const result = current
+    ? await requestEmailVerification({
+        userId: current.user.id,
+        requestBaseUrl: request.url,
+        next,
+      })
+    : email
+      ? await requestEmailVerificationByEmail({
+          email,
+          requestBaseUrl: request.url,
+          next,
+        })
+      : { status: "missing_user" as const };
 
   if (result.status === "missing_user") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({
+      success: true,
+      message: "If an unverified account exists for this email, a verification email will be sent.",
+    });
   }
 
   if (result.status === "email_not_configured") {

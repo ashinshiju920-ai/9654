@@ -5,7 +5,11 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { getRuntimeEnvValue } from "@/lib/cloudflare/runtime";
 import { withDb } from "@/lib/db";
 import { emailVerificationTokens, passwordResetTokens, users } from "@/lib/db/schema";
-import { resetPasswordTemplate, verifyEmailTemplate, passwordChangedTemplate } from "@/lib/email/templates";
+import {
+  resetPasswordTemplate,
+  verifyEmailTemplate,
+  passwordChangedTemplate,
+} from "@/lib/email/templates";
 import { sendTransactionalEmail } from "@/lib/email/resend";
 import { hashPasswordAsync } from "./password";
 import { invalidateAllUserSessions } from "./session";
@@ -139,7 +143,9 @@ export async function resetPasswordWithToken(input: {
     try {
       const res = await sendTransactionalEmail({ to: user.email, ...template });
       if (res.status === "skipped") {
-        console.warn(`[Auth] Password changed email skipped for ${user.email} (reason: ${res.reason})`);
+        console.warn(
+          `[Auth] Password changed email skipped for ${user.email} (reason: ${res.reason})`,
+        );
       }
     } catch (err) {
       console.error(`[Auth] Failed to send password changed confirmation to ${user.email}:`, err);
@@ -156,7 +162,47 @@ export async function requestEmailVerification(input: {
 }): Promise<{ status: "sent" | "already_verified" | "missing_user" | "email_not_configured" }> {
   const user = await getEmailUser(input.userId);
 
+  return sendEmailVerificationForUser(user, input.requestBaseUrl, input.next);
+}
+
+export async function requestEmailVerificationByEmail(input: {
+  email: string;
+  requestBaseUrl: string;
+  next?: string | null;
+}): Promise<{ status: "sent" | "already_verified" | "missing_user" | "email_not_configured" }> {
+  const normalizedEmail = normalizeEmail(input.email);
+
+  if (!isValidEmail(normalizedEmail)) {
+    return { status: "missing_user" };
+  }
+
+  const [user] = await withDb((db) =>
+    db
+      .select({
+        id: users.id,
+        email: users.email,
+        fullName: users.fullName,
+        accountStatus: users.accountStatus,
+        emailVerified: users.emailVerified,
+      })
+      .from(users)
+      .where(eq(users.email, normalizedEmail))
+      .limit(1),
+  );
+
+  return sendEmailVerificationForUser(user || null, input.requestBaseUrl, input.next);
+}
+
+async function sendEmailVerificationForUser(
+  user: EmailUser | null,
+  requestBaseUrl: string,
+  next?: string | null,
+): Promise<{ status: "sent" | "already_verified" | "missing_user" | "email_not_configured" }> {
   if (!user) {
+    return { status: "missing_user" };
+  }
+
+  if (user.accountStatus !== "active") {
     return { status: "missing_user" };
   }
 
@@ -176,18 +222,20 @@ export async function requestEmailVerification(input: {
     }),
   );
 
-  const baseUrl = (await getRuntimeEnvValue("APP_BASE_URL")) || input.requestBaseUrl;
+  const baseUrl = (await getRuntimeEnvValue("APP_BASE_URL")) || requestBaseUrl;
   const actionUrl = buildActionUrl({
     baseUrl,
     path: "/api/auth/verify-email",
     token: rawToken,
-    next: safeAppPath(input.next, "/dashboard"),
+    next: safeAppPath(next, "/dashboard"),
   });
   const template = verifyEmailTemplate({ fullName: user.fullName, actionUrl });
   try {
     const result = await sendTransactionalEmail({ to: user.email, ...template });
     if (result.status === "skipped") {
-      console.warn(`[Auth] Verification email skipped for ${user.email} (reason: ${result.reason})`);
+      console.warn(
+        `[Auth] Verification email skipped for ${user.email} (reason: ${result.reason})`,
+      );
     }
     return { status: result.status === "sent" ? "sent" : "email_not_configured" };
   } catch (err) {

@@ -29,6 +29,7 @@ export function SignupForm({
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [existingAccountDetected, setExistingAccountDetected] = useState(false);
 
@@ -76,7 +77,7 @@ export function SignupForm({
         }
 
         setIsSuccess(true);
-        setMessage("Account created successfully! Redirecting...");
+        setMessage("Account created successfully. We sent a verification email. Redirecting...");
 
         setTimeout(() => {
           router.replace(targetDestination);
@@ -116,6 +117,40 @@ export function SignupForm({
         setMessage("An error occurred connecting to the server. Please try again.");
         setIsLoading(false);
       }
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!email.trim()) {
+      setMessage("Enter your email address first.");
+      setIsSuccess(false);
+      return;
+    }
+
+    setIsResending(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, next: targetDestination }),
+      });
+      const data = (await response.json()) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        setIsSuccess(false);
+        setMessage(data.error || "Could not resend the verification email.");
+        return;
+      }
+
+      setIsSuccess(true);
+      setMessage(data.message || "Verification email sent. Check your inbox.");
+    } catch {
+      setIsSuccess(false);
+      setMessage("An error occurred connecting to the server. Please try again.");
+    } finally {
+      setIsResending(false);
     }
   }
 
@@ -160,9 +195,7 @@ export function SignupForm({
             background: mode === "signup" ? "#ffffff" : "transparent",
             color: mode === "signup" ? "#0f172a" : "#64748b",
             boxShadow:
-              mode === "signup"
-                ? "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05)"
-                : "none",
+              mode === "signup" ? "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05)" : "none",
           }}
         >
           Create Account
@@ -188,9 +221,7 @@ export function SignupForm({
             background: mode === "signin" ? "#ffffff" : "transparent",
             color: mode === "signin" ? "#0f172a" : "#64748b",
             boxShadow:
-              mode === "signin"
-                ? "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05)"
-                : "none",
+              mode === "signin" ? "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05)" : "none",
           }}
         >
           Sign In
@@ -252,9 +283,7 @@ export function SignupForm({
               value={password}
             />
           </span>
-          {mode === "signup" && (
-            <small className="login-field__hint">Minimum 8 characters.</small>
-          )}
+          {mode === "signup" && <small className="login-field__hint">Minimum 8 characters.</small>}
         </label>
 
         {mode === "signup" && (
@@ -370,6 +399,27 @@ export function SignupForm({
               </button>
             </>
           )}
+        </p>
+
+        <p className="login-form__support">
+          Need the verification email again?{" "}
+          <button
+            type="button"
+            disabled={isResending || isLoading}
+            onClick={handleResendVerification}
+            style={{
+              background: "none",
+              border: "none",
+              color: "inherit",
+              cursor: isResending || isLoading ? "not-allowed" : "pointer",
+              font: "inherit",
+              opacity: isResending || isLoading ? 0.65 : 1,
+              padding: 0,
+              textDecoration: "underline",
+            }}
+          >
+            {isResending ? "Sending..." : "Resend verification"}
+          </button>
         </p>
       </form>
     </div>
